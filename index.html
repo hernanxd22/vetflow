@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VetFlow - Sistema de turnos veterinarios</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --teal: #0f9d7e;
+      --teal-dark: #0b7a64;
+      --teal-light: #e0f5f0;
+      --teal-mid: #1bbfa0;
+      --navy: #0d3d4f;
+      --cream: #f7f9f8;
+      --white: #ffffff;
+      --text: #1a2e35;
+      --muted: #5a7a82;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--navy) 0%, #1a6b5a 50%, var(--teal) 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 20% 80%, rgba(27,191,160,0.2) 0%, transparent 60%),
+                  radial-gradient(ellipse at 80% 20%, rgba(15,157,126,0.15) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .hero-paw {
+      font-size: 48px;
+      margin-bottom: 16px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(3rem, 8vw, 6rem);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -2px;
+      line-height: 1;
+      margin-bottom: 20px;
+    }
+
+    .hero p {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: rgba(255,255,255,0.75);
+      max-width: 500px;
+      line-height: 1.7;
+      font-weight: 300;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.9);
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 6px 16px;
+      border-radius: 100px;
+      margin-bottom: 32px;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(10px);
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: rgba(255,255,255,0.4);
+      font-size: 0.75rem;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(6px); }
+    }
+
+    .scroll-hint svg { opacity: 0.4; }
+
+    /* SERVICES */
+    .services {
+      padding: 100px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 60px;
+      line-height: 1.2;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid rgba(15,157,126,0.1);
+      border-radius: 20px;
+      padding: 40px 32px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--teal), var(--teal-mid));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 60px rgba(15,157,126,0.12);
+      border-color: rgba(15,157,126,0.25);
+    }
+
+    .card:hover::before { transform: scaleX(1); }
+
+    .card-icon {
+      width: 52px;
+      height: 52px;
+      background: var(--teal-light);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .card-icon svg { width: 24px; height: 24px; color: var(--teal); }
+
+    .card h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    .card p {
+      font-size: 0.92rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* CTA */
+    .cta {
+      background: linear-gradient(135deg, var(--navy) 0%, #1a5a4a 100%);
+      padding: 100px 24px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(27,191,160,0.15) 0%, transparent 70%);
+    }
+
+    .cta h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      font-weight: 800;
+      color: var(--white);
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .cta p {
+      color: rgba(255,255,255,0.65);
+      font-size: 1rem;
+      margin-bottom: 40px;
+      position: relative;
+      font-weight: 300;
+    }
+
+    .btn-telegram {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: #2AABEE;
+      color: white;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      padding: 16px 36px;
+      border-radius: 100px;
+      text-decoration: none;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(42,171,238,0.35);
+    }
+
+    .btn-telegram:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 40px rgba(42,171,238,0.45);
+      background: #1a9fd4;
+    }
+
+    .btn-telegram svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+    /* FOOTER */
+    footer {
+      background: var(--navy);
+      padding: 28px 24px;
+      text-align: center;
+      color: rgba(255,255,255,0.35);
+      font-size: 0.82rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-paw">🐾</div>
+    <div class="hero-badge">Sistema de turnos veterinarios</div>
+    <h1>VetFlow</h1>
+    <p>El sistema moderno de gestión veterinaria que simplifica la reserva de turnos y mejora la atención para tus mascotas.</p>
+    <div class="scroll-hint">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 3v10M4 9l4 4 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- SERVICES -->
+  <section class="services">
+    <div class="section-label">Nuestros servicios</div>
+    <div class="section-title">Todo lo que tu mascota necesita</div>
+    <div class="cards">
+
+      <div class="card">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+        </div>
+        <h3>Consultas veterinarias</h3>
+        <p>Atención médica completa y personalizada para tus mascotas.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3l18 18M10.5 10.677a2 2 0 002.823 2.823"/>
+            <path d="M9.363 5.365A9.466 9.466 0 0112 5c4 0 7.333 2.333 8 7-.18.887-.435 1.71-.766 2.477M3.12 12A9.512 9.512 0 007 16.95"/>
+          </svg>
+        </div>
+        <h3>Vacunación segura</h3>
+        <p>Protocolos de vacunación actualizados para proteger la salud de tu mascota.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 3h12l3 6-9 12L3 9z"/>
+            <path d="M3 9h18"/>
+          </svg>
+        </div>
+        <h3>Peluquería y baño</h3>
+        <p>Servicios de estética profesional para que tu mascota luzca genial.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <h2>¿Querés agendar una cita?</h2>
+    <p>Chateá con nuestro asistente en Telegram — agenda, reprograma o consultá en segundos</p>
+    <a href="https://t.me/Sceretibot" target="_blank" class="btn-telegram">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.45.7-.91.43l-2.52-1.86-1.22 1.17c-.13.13-.25.25-.51.25l.18-2.57 4.65-4.2c.2-.18-.04-.28-.31-.1l-5.75 3.62-2.47-.77c-.54-.17-.55-.54.11-.8l9.64-3.72c.45-.16.84.11.69.63z"/>
+      </svg>
+      Abrir en Telegram
+    </a>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    © 2026 VetFlow — Sistema de turnos veterinarios
+  </footer>
+
+</body>
+</html>
