@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
 const cors = require('cors');
 const path = require('path');
  
@@ -27,34 +28,47 @@ pool.connect()
  
 // ─── RUTAS ────────────────────────────────────────────────────
  
-// POST /api/registro → crea un cliente nuevo
+// POST /api/registro → crea cliente + usuario con contraseña
 app.post('/api/registro', async (req, res) => {
-  const { nombre, apellido, dni, telefono } = req.body;
+  const { nombre, apellido, dni, telefono, username, password } = req.body;
  
-  if (!nombre || !apellido || !dni || !telefono) {
+  if (!nombre || !apellido || !dni || !telefono || !username || !password) {
     return res.status(400).json({ error: 'Todos los campos son obligatorios' });
   }
  
-  try {
-    // Verificar si el DNI ya existe
-    const existe = await pool.query(
-      'SELECT id FROM clientes WHERE dni = $1',
-      [dni]
-    );
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+  }
  
-    if (existe.rows.length > 0) {
-      return res.status(409).json({ error: 'Ya existe un cliente con ese DNI' });
+  try {
+    // Verificar DNI duplicado
+    const existeDni = await pool.query('SELECT id FROM clientes WHERE dni = $1', [dni]);
+    if (existeDni.rows.length > 0) {
+      return res.status(409).json({ error: 'Ya existe una cuenta con ese DNI' });
     }
  
-    // Insertar nuevo cliente
-    const result = await pool.query(
+    // Verificar username duplicado
+    const existeUser = await pool.query('SELECT id FROM usuarios WHERE username = $1', [username]);
+    if (existeUser.rows.length > 0) {
+      return res.status(409).json({ error: 'Ese nombre de usuario ya está en uso' });
+    }
+ 
+    // Insertar cliente
+    const clienteResult = await pool.query(
       `INSERT INTO clientes (nombre, apellido, dni, telefono)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, nombre, apellido`,
+       VALUES ($1, $2, $3, $4) RETURNING id, nombre, apellido`,
       [nombre, apellido, dni, telefono]
     );
+    const cliente = clienteResult.rows[0];
  
-    const cliente = result.rows[0];
+    // Hashear contraseña e insertar usuario
+    const password_hash = await bcrypt.hash(password, 10);
+    await pool.query(
+      `INSERT INTO usuarios (cliente_id, username, password_hash)
+       VALUES ($1, $2, $3)`,
+      [cliente.id, username, password_hash]
+    );
+ 
     res.status(201).json({
       mensaje: 'Registro exitoso',
       cliente_id: cliente.id,
@@ -63,6 +77,50 @@ app.post('/api/registro', async (req, res) => {
  
   } catch (err) {
     console.error('Error en /api/registro:', err.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+ 
+// POST /api/login → login con username y contraseña
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+ 
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Usuario y contraseña son obligatorios' });
+  }
+ 
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.password_hash, u.cliente_id,
+              c.nombre, c.apellido, c.dni, c.telefono, c.telegram_chat_id
+       FROM usuarios u
+       JOIN clientes c ON c.id = u.cliente_id
+       WHERE u.username = $1`,
+      [username]
+    );
+ 
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
+ 
+    const user = result.rows[0];
+    const match = await bcrypt.compare(password, user.password_hash);
+ 
+    if (!match) {
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
+ 
+    res.json({
+      mensaje: 'Login exitoso',
+      cliente_id: user.cliente_id,
+      nombre: `${user.nombre} ${user.apellido}`,
+      dni: user.dni,
+      telefono: user.telefono,
+      telegram_chat_id: user.telegram_chat_id
+    });
+ 
+  } catch (err) {
+    console.error('Error en /api/login:', err.message);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
@@ -157,6 +215,19 @@ app.get('/api/mascotas/:cliente_id', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error en /api/mascotas:', err.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+ 
+// DELETE /api/mascotas/:id → elimina una mascota
+app.delete('/api/mascotas/:id', async (req, res) => {
+  const { id } = req.params;
+ 
+  try {
+    await pool.query('DELETE FROM mascotas WHERE id = $1', [id]);
+    res.json({ mensaje: 'Mascota eliminada' });
+  } catch (err) {
+    console.error('Error en DELETE /api/mascotas:', err.message);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
