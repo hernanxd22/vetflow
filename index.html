@@ -486,7 +486,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 </main>
  
 <script>
-  const WEBHOOK = 'https://proyec1-n8n.bxyea0.easypanel.host/webhook/registro';
+  const WEBHOOK = 'https://proyec1-server.bxyea0.easypanel.host/api/mascotas';
   const clienteId = sessionStorage.getItem('cliente_id');
   const nombre = sessionStorage.getItem('nombre');
   const apellido = sessionStorage.getItem('apellido');
@@ -509,7 +509,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     const container = document.getElementById('mascotas-container');
     container.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
     try {
-      const res = await fetch(`https://proyec1-n8n.bxyea0.easypanel.host/webhook/mascotas?cliente_id=${clienteId}`);
+      const res = await fetch('https://proyec1-server.bxyea0.easypanel.host/api/mascotas?cliente_id=' + clienteId);
       const data = await res.json();
       const mascotas = Array.isArray(data) ? data : [];
  

@@ -357,7 +357,7 @@
       `;
  
       try {
-        const res = await fetch('https://proyec1-n8n.bxyea0.easypanel.host/webhook/registro', {
+        const res = await fetch('https://proyec1-server.bxyea0.easypanel.host/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
