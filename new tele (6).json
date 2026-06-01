@@ -1,0 +1,4246 @@
+{
+  "name": "new tele",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -384,
+        208
+      ],
+      "id": "253e665f-9fef-4b89-aeec-af45689faf77",
+      "name": "Telegram Trigger",
+      "webhookId": "d6ca0df3-93fc-44ab-97bf-785b83fa2f62",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.from.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        2400
+      ],
+      "id": "d34f8063-30c2-4158-ae50-f14f12dfd4b8",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Telegram Trigger').item.json.message.text }}",
+        "options": {
+          "systemMessage": "=Tu fecha y hora actual de referencia es:\n{{ $now.setZone('America/Argentina/Buenos_Aires').format('EEEE d \"de\" MMMM \"de\" yyyy, HH:mm') }}\nZona horaria: Mendoza/Buenos Aires, Argentina.\n\nSos un asistente que SOLO clasifica intenciones.\nRespondé únicamente en JSON válido, sin texto extra.\n\nPosibles acciones:\n- agendar\n- reprogramar\n- cancelar\n- consultar\n- saludo (cuando el usuario saluda explícitamente: \"hola\", \"buenas\", \"buen día\")\n- desconocido (cualquier mensaje que no sea una acción clara ni un saludo explícito)\n- despedida (cuando el usuario agradece o se despide: \"gracias\", \"ok gracias\", \"chau\", \"hasta luego\")\n\nTambién extraé:\n- fecha (si existe)\n- hora (si existe)\n- titulo (si existe, el nombre o descripción de la cita)\n- event_id (si el usuario menciona un número o nombre de cita para reprogramar o cancelar, buscalo en el historial de conversación)\n\nFormato de respuesta:\n{\n  \"accion\": \"agendar\",\n  \"fecha\": \"YYYY-MM-DD\",\n  \"hora\": \"HH:MM\",\n  \"titulo\": null,\n  \"event_id\": null\n}\n\nReglas:\n- Si no hay fecha, poner null\n- Si no hay hora, poner null\n- Si no hay titulo, poner null\n- Si no hay event_id, poner null\n- No inventar datos\n- \"ser\", \"ok\", \"si\", \"no\" y mensajes cortos sin sentido = desconocido\n- \"gracias\", \"ok gracias\", \"chau\", \"hasta luego\", \"perfecto\", \"genial\" = despedida"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1280,
+        2192
+      ],
+      "id": "0c728afa-8fff-4cc7-80d5-9d90ba2168fb",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        2384
+      ],
+      "id": "68fcc9ca-7303-4d86-8231-e703d35e2ff9",
+      "name": "OpenRouter Chat Model1",
+      "notesInFlow": false,
+      "credentials": {
+        "openRouterApi": {
+          "id": "taZSxm8EnSZzAMas",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "timeMax": "={{ $now.plus({ month: 6 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        3344,
+        2192
+      ],
+      "id": "a9485577-f980-4ea2-aec1-b30549053183",
+      "name": "Get many events1",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const miChatId = $('Telegram Trigger').item.json.message.chat.id.toString();\nconst eventos = $input.all();\n\nconst misCitas = eventos.filter(e => \n  e.json.description?.includes(`chat_id: ${miChatId}`)\n);\n\nif (misCitas.length === 0) {\n  return [{ json: { text: '📭 No tenés citas agendadas.' } }];\n}\n\nconst mensajes = misCitas.map(e => {\n  const titulo = e.json.summary || 'Sin título';\n  const inicio = e.json.start?.dateTime || e.json.start?.date;\n  const fecha = new Date(inicio).toLocaleString('es-AR', {\n    timeZone: 'America/Argentina/Buenos_Aires',\n    dateStyle: 'short',\n    timeStyle: 'short'\n  });\n  return `📅 <b>${titulo}</b>\\n🕐 ${fecha}`;\n});\n\nreturn [{ json: { text: `⏰ Tus citas:\\n\\n${mensajes.join('\\n\\n')}` } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3616,
+        2192
+      ],
+      "id": "a02c43e7-0b9c-4e77-9ecd-c3c8f8799953",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fa20131c-fa1c-4228-b41c-3c982dfaa2c6",
+              "name": "body.data.key.id",
+              "value": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -128,
+        208
+      ],
+      "id": "283eaf10-1058-4baf-8972-ed1230949f6b",
+      "name": "ids"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json.output;\n// limpiar los ```json\nraw = raw.replace(/```json/g, \"\").replace(/```/g, \"\").trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  parsed = {\n    accion: null,\n    fecha: null,\n    hora: null,\n    titulo: null,\n    event_id: \"el_id_del_evento\",\n    error: \"No se pudo parsear\"\n  };\n}\n\nreturn [{\n  json: parsed\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        2192
+      ],
+      "id": "ab6471ee-903c-42cb-b937-faf6f93db672",
+      "name": "de texto a json"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "chat_id",
+              "lookupValue": "={{ $('Telegram Trigger').first().json.message.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        112,
+        208
+      ],
+      "id": "464a1f0c-f601-48bd-b669-9bb7bf86ff2c",
+      "name": "Get row(s) in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Tu fecha y hora actual es:\n{{ $now.setZone('America/Argentina/Buenos_Aires').format('EEEE d \"de\" MMMM \"de\" yyyy, HH:mm') }}\nEl usuario está agendando una cita. Extraé los datos del mensaje y determiná qué falta.\nRespondé SOLO en JSON válido:\n{\n  \"fecha\": \"YYYY-MM-DD o null\",\n  \"hora\": \"HH:MM o null\",\n  \"titulo\": null,\n  \"completo\": false,\n  \"mensaje_falta\": \" armar un amigable pidiendo SOLO lo que falta\n}\n\nContexto: El usuario está en proceso de agendar una cita.\n- Solo interpretá algo como TÍTULO si parece un nombre real, descripción o motivo de cita (ej: \"hernan\", \"dentista\", \"reunion con juan\", \"control medico\")\n- Si el mensaje parece texto random sin sentido (ej: \"rfjrijfr\", \"asdasd\", \"qwerty\"), ponelo como titulo: null y pedí el título de nuevo\n- Una palabra suelta con vocales y sentido = título válido\n- Letras random sin vocales o sin sentido = NO es título\n\nReglas:\n- Interpretá fechas relativas: \"mañana\", \"el lunes\", \"en 2 días\"\n- Si falta algún dato, armar un mensaje_falta amigable pidiendo SOLO lo que falta\n- Si están los 3 datos, completo = true y mensaje_falta = null\n- Si completo = true, NO inventar datos que no dijo el usuario\nMensaje del usuario: {{ $('Telegram Trigger').item.json.message.text }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1376,
+        -1312
+      ],
+      "id": "2e55bd61-1d8f-43cc-a7c9-4517f0112660",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        -1072
+      ],
+      "id": "ae47b247-b32b-41b0-a647-3b4ebfcc5ce2",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "taZSxm8EnSZzAMas",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.from.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1504,
+        -1072
+      ],
+      "id": "190ec571-9099-4802-b329-b0865ea163ba",
+      "name": "Simple Memory1"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "start": "={{ $('cambia de texto a json,modifica sheet').first().json.fecha }}T{{ $('cambia de texto a json,modifica sheet').first().json.hora }}:00-03:00",
+        "end": "={{ $('cambia de texto a json,modifica sheet').first().json.fecha }}T{{ $('cambia de texto a json,modifica sheet').first().json.hora }}:00-03:00",
+        "additionalFields": {
+          "description": "=chat_id: {{ $('cambia de texto a json,modifica sheet').first().json.chat_id }}",
+          "summary": "={{ $('cambia de texto a json,modifica sheet').first().json.titulo }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2784,
+        -1488
+      ],
+      "id": "c44f4636-53c4-49d0-8ebe-f3e1cd883dc1",
+      "name": "Create an event1",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear el output del AI Agent (viene como string)\nlet raw = $('AI Agent').item.json.output;\nraw = raw.replace(/```json/g, '').replace(/```/g, '').trim();\n\nlet extraido;\ntry {\n  extraido = JSON.parse(raw);\n} catch(e) {\n  extraido = { fecha: null, hora: null, titulo: null };\n}\n\nconst row = $('Get row(s) in sheet').item.json;\n\n// Mergear con lo que ya había en el sheet\nconst fecha  = extraido.fecha  || row.fecha_temp  || null;\nconst hora   = extraido.hora   || row.hora_temp   || null;\nconst titulo = extraido.titulo || row.titulo_temp || null;\n\nconst completo = !!(fecha && hora && titulo);\n\nreturn [{\n  json: {\n    fecha,\n    hora,\n    titulo,\n    chat_id: row.chat_id,\n    row_number: row.row_number,\n    completo\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        -1312
+      ],
+      "id": "50a0cd1d-7f60-4022-a0fd-632db29d6363",
+      "name": "cambia de texto a json,modifica sheet"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $('AI Agent').item.json.output;\nraw = raw.replace(/```json/g, '').replace(/```/g, '').trim();\nconst parsed = JSON.parse(raw);\n\nreturn [{ json: { mensaje: parsed.mensaje_falta } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        -1200
+      ],
+      "id": "08a1380a-fd37-4fde-ac71-8ccbcd611309",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "=esperando_fecha",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "cfd47271-7bdf-44e3-a250-454992fd9a16"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "21e80c0f-d477-401b-b41d-6122a418a044",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "=ESPERANDO_NUMERO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b0797df6-7d65-4a87-ab16-ec778e31c21f",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "ESPERANDO_DIA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d56e7a55-0c27-4954-beaa-342cf760e5fc",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "cancelando",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cdcb4c4b-90d0-4adf-ac1a-80d11327eff6",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "CANCELAR_CONFIRMAR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9280b0bc-9e19-4fcb-b2fa-f1bce55bb1b0",
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1040,
+        160
+      ],
+      "id": "f11ff263-371d-4d39-9d4b-6de5d53895c4",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "timeMax": "={{ $now.plus({ month: 6 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        3648,
+        2400
+      ],
+      "id": "b9296d98-77dc-4aca-9b01-535fe4b8d883",
+      "name": "Get many events3",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const miChatId = $('Telegram Trigger').item.json.message.chat.id.toString();\nconst eventos = $input.all();\n\nconst misCitas = eventos.filter(e => \n  e.json.description?.includes(`chat_id: ${miChatId}`)\n);\n\nif (misCitas.length === 0) {\n  return [{ json: { text: '📭 No tenés citas agendadas.' } }];\n}\n\nconst mensajes = misCitas.map((e, index) => {\n  const titulo = e.json.summary || 'Sin título';\n  const inicio = e.json.start?.dateTime || e.json.start?.date;\n  const fecha = new Date(inicio).toLocaleString('es-AR', {\n    timeZone: 'America/Argentina/Buenos_Aires',\n    dateStyle: 'short',\n    timeStyle: 'short'\n  });\n  return `${index + 1}. 📅 *${titulo}*\\n🕐 ${fecha}`;\n});\n\nconst idMap = misCitas.map((e, index) => ({\n  numero: index + 1,\n  titulo: e.json.summary || 'Sin título',\n  id: e.json.id\n}));\n\nreturn [{ \n  json: { \n    text: `🗓 Tus citas:\\n\\n${mensajes.join('\\n\\n')}\\n\\n¿Cuál querés mover? Decime el número..`,\n    idMap: idMap\n  } \n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3952,
+        2400
+      ],
+      "id": "decd45ac-1678-4861-938c-6e4633eab4e9",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Telegram Trigger').first().json.message.text }}",
+        "options": {
+          "systemMessage": "=Sos un extractor de fechas y horas. Respondés ÚNICAMENTE con JSON válido, sin texto extra.\n\nHOY ES: {{ $now.setZone('America/Argentina/Buenos_Aires').format('yyyy-MM-dd') }}\nHORA ACTUAL: {{ $now.setZone('America/Argentina/Buenos_Aires').format('HH:mm') }}\nZONA HORARIA: America/Argentina/Buenos_Aires (UTC-3)\n\nREGLAS:\n- \"mañana\" = HOY + 1 día\n- \"pasado\" = HOY + 2 días\n- \"el lunes/martes/etc\" = próximo día de esa semana\n- Si el usuario menciona una hora, USALA EXACTAMENTE. \"11 am\" = 11:00, \"3 de la tarde\" = 15:00, \"9 y media\" = 09:30, \"mediodía\" = 12:00\n- Si NO dice hora, NO inventes una. Devolvé error pidiendo la hora.\n- El offset siempre es -03:00\n\nEJEMPLO: si el usuario dice \"mañana a las 11 am\" y HOY ES 2026-04-06, respondé:\n{\"fecha\":\"2026-04-07\",\"hora\":\"11:00\",\"datetime_iso\":\"2026-04-07T11:00:00-03:00\",\"error\":null}\n\nFORMATO DE RESPUESTA (solo esto, nada más):\n{\"fecha\":\"YYYY-MM-DD\",\"hora\":\"HH:mm\",\"datetime_iso\":\"YYYY-MM-DDTHH:mm:00-03:00\",\"error\":null}\n\nSi no entendés la fecha o falta la hora:\n{\"fecha\":null,\"hora\":null,\"datetime_iso\":null,\"error\":\"mensaje explicando qué falta\"}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1536,
+        160
+      ],
+      "id": "98260775-ccd1-412c-b5af-400f0aedc0a0",
+      "name": "AI Agent2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        400
+      ],
+      "id": "ba0b37dc-3b0c-4df7-82ee-7555594495ba",
+      "name": "OpenRouter Chat Model2",
+      "credentials": {
+        "openRouterApi": {
+          "id": "taZSxm8EnSZzAMas",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "timeMax": "={{ $now.plus({ week: 3 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        -512
+      ],
+      "id": "3e541bf3-ab62-4f54-b0f1-6e6b6f9d3ebb",
+      "name": "Get many events4",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const telegramData = $('Telegram Trigger').first().json;\nconst mensajeUsuario = telegramData.message.text.trim();\nconst chatId = telegramData.message.chat.id.toString();\n\nconst todosLosEventos = $('Get many events4').all();\nconst eventos = todosLosEventos.filter(e => {\n  const desc = e.json.description || '';\n  return desc.includes(`chat_id: ${chatId}`);\n});\n\nconst match = mensajeUsuario.match(/\\d+/);\nconst indice = match ? parseInt(match[0]) - 1 : -1;\n\nif (indice >= 0 && eventos[indice]) {\n  return {\n    json: {\n      encontrado: true,\n      eventID: eventos[indice].json.id,\n      resumen: eventos[indice].json.summary,\n      proximo_paso: \"ESPERANDO_FECHA\"\n    }\n  };\n} else {\n  return {\n    json: {\n      encontrado: false,\n      error_msg: \"Ese número no está en la lista. Mandame uno válido.\"\n    }\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        -512
+      ],
+      "id": "fa341807-1e31-4818-9f41-24471260510f",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $('AI Agent2').first().json.output;\nconst clean = output.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(clean);\n\nif (parsed.error) {\n  return { json: { fecha: null, hora: null, datetime_iso: null, error: parsed.error } };\n}\n\nconst ahora = Date.now();\nconst fechaDeseada = new Date(parsed.datetime_iso); \n\nif (fechaDeseada.getTime() <= ahora) {\n  return { json: { fecha: null, hora: null, datetime_iso: null, error: \"Esa fecha y hora ya pasaron. Elegí un momento futuro.\" } };\n}\n\nreturn {\n  json: {\n    fecha: parsed.fecha,\n    hora: parsed.hora,\n    datetime_iso: parsed.datetime_iso,\n    error: null\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1952,
+        160
+      ],
+      "id": "eec88ebb-4d57-480d-b531-db5540fc1a69",
+      "name": "Code in JavaScript8"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d2e35386-7d9b-4247-a1cb-2a6d1476ba9b",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2208,
+        160
+      ],
+      "id": "03527ee0-f583-4607-b4be-20a6898127df",
+      "name": "If7"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "timeMax": "={{ $now.plus({ month: 6 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        3664,
+        2656
+      ],
+      "id": "38a7c09f-ec03-4166-ad5f-3fa1b7133a9c",
+      "name": "Get many events5",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const miChatId = $('Telegram Trigger').item.json.message.chat.id.toString();\nconst eventos = $input.all();\n\nconst misCitas = eventos.filter(e => \n  e.json.description?.includes(`chat_id: ${miChatId}`)\n);\n\nif (misCitas.length === 0) {\n  return [{ json: { text: '📭 No tenés citas agendadas.' } }];\n}\n\nconst mensajes = misCitas.map((e, index) => {\n  const titulo = e.json.summary || 'Sin título';\n  const inicio = e.json.start?.dateTime || e.json.start?.date;\n  const fecha = new Date(inicio).toLocaleString('es-AR', {\n    timeZone: 'America/Argentina/Buenos_Aires',\n    dateStyle: 'short',\n    timeStyle: 'short'\n  });\n  return `${index + 1}. 📅 *${titulo}*\\n🕐 ${fecha}`;\n});\n\nconst idMap = misCitas.map((e, index) => ({\n  numero: index + 1,\n  titulo: e.json.summary || 'Sin título',\n  id: e.json.id\n}));\n\nreturn [{ \n  json: { \n    text: `🗓 Tus citas:\\n\\n${mensajes.join('\\n\\n')}\\n\\n¿Cuál querés cancelar? Decime el número..`,\n    idMap: idMap\n  } \n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3968,
+        2656
+      ],
+      "id": "325ce282-1962-4b4b-bf93-d00864d1beae",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "timeMax": "={{ $now.plus({ month: 6 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1472,
+        1008
+      ],
+      "id": "fb9ac101-a67a-435e-8f7e-6358188b041f",
+      "name": "Get many events6",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const telegramData = $('Telegram Trigger').first().json;\nconst mensajeUsuario = telegramData.message.text.trim();\nconst chatId = telegramData.message.chat.id.toString();\n\n// Filtrar solo los eventos de este usuario\nconst todosLosEventos = $('Get many events6').all();\nconst eventos = todosLosEventos.filter(e => {\n  const desc = e.json.description || '';\n  return desc.includes(`chat_id: ${chatId}`);\n});\n\nconst match = mensajeUsuario.match(/\\d+/);\nconst indice = match ? parseInt(match[0]) - 1 : -1;\n\nif (indice >= 0 && eventos[indice]) {\n  return {\n    json: {\n      encontrado: true,\n      eventID: eventos[indice].json.id,\n      resumen: eventos[indice].json.summary,\n    }\n  };\n} else {\n  return {\n    json: {\n      encontrado: false,\n      error_msg: \"Ese número no está en la lista. Mandame uno válido.\"\n    }\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        1008
+      ],
+      "id": "e97a7cbb-53b2-4ffc-8684-c903da15be0e",
+      "name": "Code in JavaScript10"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "eventId": "={{ $('Get row(s) in sheet').first().json.event_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1920,
+        1408
+      ],
+      "id": "94a42e19-dd29-4077-8cc8-e21430aa0ea3",
+      "name": "Delete an event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9b986a16-9364-4444-aa68-441bc4c999a5",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "agendar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b421e698-a5cb-4797-8fa0-047067f9ca7b",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "consultar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5dc27afd-4114-4608-8ccd-7160c1c3ffd5",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "reprogramar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "27aa8d3e-59ae-437b-a6bc-89303a9c1ee5",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "cancelar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "bdd178b1-1229-47ca-88fb-178e2474d512",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "saludo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7e8dcb50-fd26-43ef-9758-64106081f3be",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "despedida",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        2416,
+        2128
+      ],
+      "id": "c2e39262-8658-421f-a4f8-874beea85b04",
+      "name": "determina estado"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=👋 ¡Hola! ¿En qué te puedo ayudar hoy?",
+        "replyMarkup": "=",
+        "forceReply": {},
+        "replyKeyboardOptions": {},
+        "replyKeyboardRemove": {},
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3328,
+        2880
+      ],
+      "id": "3dcab989-8533-4b90-badc-b37f207068c2",
+      "name": "saludo",
+      "webhookId": "7f581f73-2259-4da3-9b1e-bf96251b1d49",
+      "executeOnce": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=👋 ¡Hasta luego! Que tengas un buen día.",
+        "replyMarkup": "=",
+        "forceReply": {},
+        "replyKeyboardOptions": {},
+        "replyKeyboardRemove": {},
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3328,
+        3104
+      ],
+      "id": "c44da084-8235-4f94-96cf-55b21ad4988e",
+      "name": "despedida",
+      "webhookId": "7f581f73-2259-4da3-9b1e-bf96251b1d49",
+      "executeOnce": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Disculpá, ¿me podés decir la fecha,la hora y el motivo de la cita? 📅",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3664,
+        1712
+      ],
+      "id": "d28937b7-94de-4d89-996b-f975df3c25fb",
+      "name": "agendar",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3872,
+        2192
+      ],
+      "id": "c659875e-3c55-46ff-b266-a0a3faffd3f7",
+      "name": "consultar",
+      "webhookId": "7f581f73-2259-4da3-9b1e-bf96251b1d49",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $('Code in JavaScript4').item.json.text }}",
+        "replyMarkup": "=",
+        "forceReply": {},
+        "replyKeyboardOptions": {},
+        "replyKeyboardRemove": {},
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4192,
+        2400
+      ],
+      "id": "3151a1ed-f25e-4c22-8726-60b02749aa92",
+      "name": "reprogramar",
+      "webhookId": "7f581f73-2259-4da3-9b1e-bf96251b1d49",
+      "executeOnce": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $('Code in JavaScript9').item.json.text }}",
+        "replyMarkup": "=",
+        "forceReply": {},
+        "replyKeyboardOptions": {},
+        "replyKeyboardRemove": {},
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4224,
+        2656
+      ],
+      "id": "a2f79a90-40d5-4c1e-8efc-9ed85552a6e2",
+      "name": "cancelar",
+      "webhookId": "7f581f73-2259-4da3-9b1e-bf96251b1d49",
+      "executeOnce": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').item.json.chat_id }}",
+            "estado": "=esperando_fecha"
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3312,
+        1712
+      ],
+      "id": "8c556e0c-0b67-44c4-9ea9-742ba3b0846a",
+      "name": "esperando_fecha",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').item.json.chat_id }}",
+            "estado": "=ESPERANDO_NUMERO"
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3360,
+        2400
+      ],
+      "id": "967539ab-4373-4373-b13f-b2a71bad04c7",
+      "name": "esperando_numero",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').item.json.chat_id }}",
+            "estado": "=cancelando"
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3360,
+        2656
+      ],
+      "id": "bf9e646b-15b0-48cd-a38b-867ecd839734",
+      "name": "cancelando",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "377bde2c-3255-4dd7-8b68-93a61cee2aa4",
+              "leftValue": "={{ $json.completo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2176,
+        -1312
+      ],
+      "id": "bf10e99b-f301-43d9-a23e-c9683ed78494",
+      "name": "datos completos?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.mensaje }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2960,
+        -1200
+      ],
+      "id": "fb0e918c-1bc0-4183-a6da-18ff46833f56",
+      "name": "msj de ia",
+      "webhookId": "6f9c5d33-c919-477b-b539-828e46b66565",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').item.json.chat_id }}",
+            "estado": "=esperando_fecha",
+            "fecha_temp": "={{ $json.fecha }}",
+            "hora_temp": "={{ $json.hora }}",
+            "titulo_temp": "={{ $json.titulo }}"
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2528,
+        -1200
+      ],
+      "id": "337b5b87-1015-40c2-babd-165caec847e4",
+      "name": "agregar datos",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').item.json.chat_id }}",
+            "estado": "=normal",
+            "fecha_temp": "=",
+            "hora_temp": "=",
+            "titulo_temp": "="
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2544,
+        -1488
+      ],
+      "id": "335089c2-2d88-4a13-b21b-fd9121011cea",
+      "name": "deja vacio",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=✅ ¡Listo! Tu cita fue agendada para el {{ $('cambia de texto a json,modifica sheet').first().json.fecha }} a las {{ $('cambia de texto a json,modifica sheet').first().json.hora }} 😊",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3008,
+        -1488
+      ],
+      "id": "a7086294-5aa8-4a88-bbd3-a49bf53ecc18",
+      "name": "agendado",
+      "webhookId": "6f9c5d33-c919-477b-b539-828e46b66565",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').first().json.chat_id }}",
+            "estado": "=ESPERANDO_DIA",
+            "event_id": "={{ $('Code in JavaScript7').first().json.eventID }}"
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2240,
+        -688
+      ],
+      "id": "cf363fcc-bcee-4f21-a618-4fb1a040ae49",
+      "name": "guarda id y esperando_dia",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=Perfecto, vamos a reprogramar: *{{ $('Code in JavaScript7').first().json.resumen }}*. ¿Para qué día y hora la querés pasar?",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2512,
+        -688
+      ],
+      "id": "ad751d6c-b6a1-4735-b896-b5d6cfb3e0c4",
+      "name": "pasar hora y fecha",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f4d72ec2-0c94-40f2-8bf4-93ba1eb2818a",
+              "leftValue": "={{ $json.encontrado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        -512
+      ],
+      "id": "36096268-1ed4-4f54-8543-484ae3ed5dae",
+      "name": "id se encontro?"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').first().json.chat_id }}",
+            "estado": "=Normal",
+            "event_id": "="
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3376,
+        -224
+      ],
+      "id": "7a19cbbf-f826-43e6-bde3-14c20afe38ab",
+      "name": "limpia sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "eventId": "={{ $('Get row(s) in sheet').first().json.event_id }}",
+        "updateFields": {
+          "end": "={{ DateTime.fromISO($('Code in JavaScript8').first().json.datetime_iso).plus({hours: 1}).toISO() }}",
+          "start": "={{ $('Code in JavaScript8').first().json.datetime_iso }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        3648,
+        -224
+      ],
+      "id": "ce618ab0-8198-49c5-bc70-f914c6a13323",
+      "name": "reprograma",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=✅ Listo! Tu turno *{{ $('Get row(s) in sheet').first().json.nombre }}* fue reprogramado para el {{ $('Code in JavaScript8').first().json.fecha }} a las {{ $('Code in JavaScript8').first().json.hora }}.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3920,
+        -224
+      ],
+      "id": "8d213bbd-72aa-4a7b-b9b2-ce1a3eeabcca",
+      "name": "confirma reprogramacion",
+      "webhookId": "6f9c5d33-c919-477b-b539-828e46b66565",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $('Code in JavaScript8').first().json.error }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2528,
+        304
+      ],
+      "id": "26a56c6e-ecba-4e90-9ab7-a498a8fc1115",
+      "name": "msj ia error",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f4d72ec2-0c94-40f2-8bf4-93ba1eb2818a",
+              "leftValue": "={{ $json.encontrado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2032,
+        1008
+      ],
+      "id": "3b7a409b-679e-46f8-8e7d-fba4ab0732e6",
+      "name": "se encontro el id?"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').first().json.chat_id }}",
+            "estado": "=CANCELAR_CONFIRMAR",
+            "event_id": "={{ $('Code in JavaScript10').first().json.eventID }}"
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2224,
+        784
+      ],
+      "id": "f6521aee-abaa-44a9-aad7-54d9c3bff602",
+      "name": "guarda en evento_id y cambia a cancelar_confirmacion",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=⚠️ ¿Seguro que querés cancelar el turno *{{ $('Code in JavaScript10').first().json.resumen }}*? \n\nRespondé *SI* para confirmar o *NO* para cancelar.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2512,
+        784
+      ],
+      "id": "9b6b7247-2776-42b2-994c-e3167000e057",
+      "name": "estas seguro?",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $('Code in JavaScript10').first().json.error_msg }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2352,
+        1120
+      ],
+      "id": "d52e5b46-d649-4a42-a40e-80372fc01451",
+      "name": "id no encontrado",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6f47c79c-6f5a-4873-9b9c-fcc5fa0e04de",
+              "leftValue": "={{ $('Telegram Trigger').first().json.message.text.trim().toLowerCase() }}",
+              "rightValue": "si",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        1568
+      ],
+      "id": "530f1f85-cb0a-45c0-b52b-ed1fc0cc892e",
+      "name": "confirma eliminacion?"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').first().json.chat_id }}",
+            "estado": "=Normal",
+            "event_id": "="
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2192,
+        1408
+      ],
+      "id": "aa5fde96-2f83-4c60-9d15-4cf83ddca463",
+      "name": "limpia sheet1",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=✅ Listo, tu turno fue cancelado correctamente.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2432,
+        1408
+      ],
+      "id": "d00a07d4-e1e6-48af-b075-604648caab88",
+      "name": "cita eliminada",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').first().json.chat_id }}",
+            "estado": "=Normal",
+            "event_id": "="
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1920,
+        1696
+      ],
+      "id": "25da4390-b8b9-4487-8a21-1eee358ee757",
+      "name": "se limpia sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=👍 Okey, operación cancelada. Tu turno no fue eliminado.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2192,
+        1696
+      ],
+      "id": "d885ff09-7188-4eb4-8686-dc77ee98e0ff",
+      "name": "no se elimino",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a137d840-a9b1-43f3-a558-e05303b48fe4",
+              "leftValue": "={{ $('Get row(s) in sheet').item.json.chat_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2992,
+        1824
+      ],
+      "id": "b197bcd4-b795-457a-811a-b86f42f35371",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Telegram Trigger').item.json.message.from.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3312,
+        1952
+      ],
+      "id": "16055505-eb34-4381-b8da-31887aaad786",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Disculpá, ¿me podés decir la fecha,la hora y el motivo de la cita? 📅",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3792,
+        1952
+      ],
+      "id": "3b720e90-7e66-42f8-870f-8a573cb2af99",
+      "name": "agendar1",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+            "estado": "=esperando_fecha"
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3552,
+        1952
+      ],
+      "id": "63df539e-b88a-4d60-9933-705295d4ffcc",
+      "name": "esperando_fecha1",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "timeMin": "={{ $('cambia de texto a json,modifica sheet').item.json.fecha }}T{{ $('cambia de texto a json,modifica sheet').item.json.hora }}:00-03:00",
+        "timeMax": "={{ DateTime.fromISO($('cambia de texto a json,modifica sheet').item.json.fecha + 'T' + $('cambia de texto a json,modifica sheet').item.json.hora + ':00-03:00').plus({ hours: 1 }).toISO() }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1920,
+        -1792
+      ],
+      "id": "a62a1a6a-bc05-4d23-abf7-809ad670966f",
+      "name": "Get many events",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const chatId = $('Telegram Trigger').item.json.message.chat.id.toString();\nconst fecha = $('cambia de texto a json,modifica sheet').item.json.fecha;\nconst hora = $('cambia de texto a json,modifica sheet').item.json.hora;\nconst eventIdActual = $('cambia de texto a json,modifica sheet').item.json.event_id || null;\n\n// Forzamos la conversión correcta a UTC\nconst fechaDeseada = new Date(`${fecha}T${hora}:00.000-03:00`);\nconst fechaFin = new Date(fechaDeseada.getTime() + 60 * 60 * 1000);\n\nconst eventos = $input.all();\n\nconst hayConflicto = eventos.some(e => {\n  if (!e.json.start?.dateTime) return false;\n  if (eventIdActual && e.json.id === eventIdActual) return false;\n  \n  const inicio = new Date(e.json.start.dateTime);\n  const fin = new Date(e.json.end.dateTime);\n\n  // Comparamos todo en millisegundos UTC\n  return fechaDeseada.getTime() <= fin.getTime() && fechaFin.getTime() > inicio.getTime();\n});\n\nreturn [{ json: { \n  hayConflicto, \n  fechaDeseada: fechaDeseada.toISOString(), \n  fechaFin: fechaFin.toISOString() \n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        -1792
+      ],
+      "id": "dd7d56f0-33fb-4b80-8e7c-cad42dfcfa1d",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c4cd9feb-ff4c-476e-b9f2-3b169452f582",
+              "leftValue": "={{ $json.hayConflicto }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2576,
+        -1792
+      ],
+      "id": "2df64e92-dd41-4f42-b1e2-61ab3f37bde2",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $('Code in JavaScript7').first().json.error_msg }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2240,
+        -336
+      ],
+      "id": "2b0fa540-a30f-4c77-81de-bfed81a8eda0",
+      "name": "msj de error",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "timeMin": "=",
+        "timeMax": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2448,
+        0
+      ],
+      "id": "312e3d82-7dad-4f9f-a768-4541977ce8ac",
+      "name": "Get many events2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const chatId = $('Telegram Trigger').item.json.message.chat.id.toString();\nconst fecha = $('If7').item.json.fecha;\nconst hora = $('If7').item.json.hora;\nconst eventIdActual = $('Get row(s) in sheet').item.json.event_id || null;\n\nconst fechaDeseada = new Date(`${fecha}T${hora}:00.000-03:00`);\nconst fechaFin = new Date(fechaDeseada.getTime() + 60 * 60 * 1000);\n\nconst eventos = $input.all();\n\nconst hayConflicto = eventos.some(e => {\n  if (!e.json.start?.dateTime) return false;\n  if (eventIdActual && e.json.id === eventIdActual) return false;\n  \n  const inicio = new Date(e.json.start.dateTime);\n  const fin = new Date(e.json.end.dateTime);\n\n  return fechaDeseada.getTime() < fin.getTime() && fechaFin.getTime() > inicio.getTime();\n});\n\nreturn [{ json: { \n  hayConflicto, \n  fechaDeseada: fechaDeseada.toISOString(), \n  fechaFin: fechaFin.toISOString() \n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2768,
+        0
+      ],
+      "id": "d07415a6-5e4b-40cf-93c2-cf560e0cc32e",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c4cd9feb-ff4c-476e-b9f2-3b169452f582",
+              "leftValue": "={{ $json.hayConflicto }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3104,
+        0
+      ],
+      "id": "7f2fa91b-e56d-4f2f-9f88-20de40022ee5",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=❌ Ya hay una cita en ese horario, elegí otra fecha y hora por favor😊",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3424,
+        144
+      ],
+      "id": "ec8d6655-68b4-41ea-a2ef-360ed22b001e",
+      "name": "disponibilidad reprogramacion",
+      "webhookId": "6f9c5d33-c919-477b-b539-828e46b66565",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=❌ Ya hay una cita en ese horario, elegí otra fecha y hora por favor😊",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2864,
+        -1984
+      ],
+      "id": "28dc635a-bb92-4f58-9f86-97e0f68e6947",
+      "name": "disponibilidad agendando",
+      "webhookId": "6f9c5d33-c919-477b-b539-828e46b66565",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "266baa14-7606-4a78-96f1-efce9277ede3",
+              "leftValue": "={{ $('Telegram Trigger').item.json.message.text.toLowerCase() }}",
+              "rightValue": "salir",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        208
+      ],
+      "id": "aed9e354-20de-4260-ac77-ecdbca22704a",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw",
+          "mode": "list",
+          "cachedResultName": "sheet de N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aKIXSJ6vcJeU7DLLjCyVwakEIsApEfACnpFitjLFjyw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Get row(s) in sheet').first().json.chat_id }}",
+            "estado": "=Normal",
+            "event_id": "="
+          },
+          "matchingColumns": [
+            "chat_id"
+          ],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_temp",
+              "displayName": "fecha_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora_temp",
+              "displayName": "hora_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo_temp",
+              "displayName": "titulo_temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_evento",
+              "displayName": "fecha_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        592,
+        16
+      ],
+      "id": "6382e6a0-443c-489e-8a41-c540c7c250a2",
+      "name": "limpia sheet2",
+      "credentials": {
+        "googleApi": {
+          "id": "OQyXMe3PCNa3aJi1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "=\"✅ Saliste de la operación. ¿En qué te puedo ayudar?\"",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        16
+      ],
+      "id": "7a05bfa3-1005-42a4-b7ee-7e6d7f8ededf",
+      "name": "salir del flujo",
+      "webhookId": "23935a7a-88ea-49d5-bc22-641763c41a09",
+      "credentials": {
+        "telegramApi": {
+          "id": "uZ04L7LMuAtwGAqt",
+          "name": "Telegram account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "de texto a json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "consultar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ids": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "de texto a json": {
+      "main": [
+        [
+          {
+            "node": "determina estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "cambia de texto a json,modifica sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event1": {
+      "main": [
+        [
+          {
+            "node": "agendado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cambia de texto a json,modifica sheet": {
+      "main": [
+        [
+          {
+            "node": "datos completos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "msj de ia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many events4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many events6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "confirma eliminacion?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "reprogramar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "id se encontro?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "If7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If7": {
+      "main": [
+        [
+          {
+            "node": "Get many events2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "msj ia error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events5": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "cancelar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events6": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript10": {
+      "main": [
+        [
+          {
+            "node": "se encontro el id?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete an event": {
+      "main": [
+        [
+          {
+            "node": "limpia sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "determina estado": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many events1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "esperando_numero",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "cancelando",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "saludo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "despedida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "esperando_fecha": {
+      "main": [
+        [
+          {
+            "node": "agendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "esperando_numero": {
+      "main": [
+        [
+          {
+            "node": "Get many events3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancelando": {
+      "main": [
+        [
+          {
+            "node": "Get many events5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "datos completos?": {
+      "main": [
+        [
+          {
+            "node": "deja vacio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "agregar datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agregar datos": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "deja vacio": {
+      "main": [
+        [
+          {
+            "node": "Create an event1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "guarda id y esperando_dia": {
+      "main": [
+        [
+          {
+            "node": "pasar hora y fecha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "id se encontro?": {
+      "main": [
+        [
+          {
+            "node": "guarda id y esperando_dia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "msj de error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "limpia sheet": {
+      "main": [
+        [
+          {
+            "node": "reprograma",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reprograma": {
+      "main": [
+        [
+          {
+            "node": "confirma reprogramacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "se encontro el id?": {
+      "main": [
+        [
+          {
+            "node": "guarda en evento_id y cambia a cancelar_confirmacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "id no encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "guarda en evento_id y cambia a cancelar_confirmacion": {
+      "main": [
+        [
+          {
+            "node": "estas seguro?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "confirma eliminacion?": {
+      "main": [
+        [
+          {
+            "node": "Delete an event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "se limpia sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "limpia sheet1": {
+      "main": [
+        [
+          {
+            "node": "cita eliminada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "se limpia sheet": {
+      "main": [
+        [
+          {
+            "node": "no se elimino",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "esperando_fecha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "esperando_fecha1": {
+      "main": [
+        [
+          {
+            "node": "agendar1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "esperando_fecha1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "disponibilidad agendando",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get many events2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "limpia sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "disponibilidad reprogramacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "limpia sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "limpia sheet2": {
+      "main": [
+        [
+          {
+            "node": "salir del flujo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "ca3f0638-e9e6-48f0-bd5a-cfe32e71fe9e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f107b2a004d026315b55c7606b549f9003a626f56317ab9dba88fdeebdc0b61f"
+  },
+  "id": "U9uUSaxCm3tbGZJc",
+  "tags": []
+}
