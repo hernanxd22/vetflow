@@ -208,7 +208,7 @@ export default function Inicio() {
   async function cargarMascotas() {
     setLoadingMascotas(true)
     try {
-      const res = await fetch(`${API}/mascotas?cliente_id=${clienteId}`)
+      const res = await fetch(`${API}/mascotas/?cliente_id=${clienteId}`)
       const data = await res.json()
       setMascotas(Array.isArray(data) ? data : [])
     } catch { setMascotas([]) }
