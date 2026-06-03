@@ -226,10 +226,17 @@ export default function Inicio() {
     if (!mNombre.trim() || !mEspecie) { setFormMsg({ type: 'error', text: 'El nombre y la especie son obligatorios.' }); return }
     setSaving(true)
     try {
-      const res = await fetch(`${API}/mascotas`, {
+      const res = await fetch(`${API}/mascotas?cliente_id=${clienteId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'registrar_mascota', cliente_id: clienteId, nombre: mNombre.trim(), especie: mEspecie, raza: mRaza || null, fecha_nacimiento: mFecha || null, peso: mPeso || null, notas_medicas: mNotas || null }),
+        body: JSON.stringify({ 
+        nombre: mNombre.trim(), 
+        especie: mEspecie, 
+        raza: mRaza || null, 
+        fecha_nacimiento: mFecha || null, 
+        peso: mPeso ? parseFloat(mPeso) : null, 
+        notas_medicas: mNotas || null 
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al guardar')
