@@ -226,7 +226,7 @@ export default function Inicio() {
     if (!mNombre.trim() || !mEspecie) { setFormMsg({ type: 'error', text: 'El nombre y la especie son obligatorios.' }); return }
     setSaving(true)
     try {
-      const res = await fetch(`${API}/mascotas?cliente_id=${clienteId}`, {
+      const res = await fetch(`${API}/mascotas/?cliente_id=${clienteId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
