@@ -9,7 +9,7 @@ type Mascota = {
   fecha_nacimiento?: string; peso?: number; notas_medicas?: string
 }
 type ChatMsg = { role: 'user' | 'bot'; text: string }
-type View = 'home' | 'registrar' | 'mascotas'
+type View = 'home' | 'registrar' | 'mascotas' | 'chat'
 
 // ─── Emoji helper ─────────────────────────────────────────
 const emojis: Record<string, string> = { perro: '🐶', gato: '🐱', conejo: '🐰', pajaro: '🐦', hamster: '🐹', otro: '🐾' }
@@ -172,6 +172,39 @@ export default function Inicio() {
   const [formMsg, setFormMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [saving, setSaving] = useState(false)
 
+  // Chat view state
+  const [msgs2, setMsgs2] = useState<ChatMsg[]>([{ role: 'bot', text: `¡Hola ${nombre.split(' ')[0] || 'usuario'}! 🐾 ¿En qué puedo ayudarte hoy? Podés pedirme agendar, reprogramar o cancelar un turno.` }])
+  const [input2, setInput2] = useState('')
+  const [typing2, setTyping2] = useState(false)
+  const bottomRef2 = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { bottomRef2.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs2, typing2])
+
+  async function sendMsg2() {
+    const text = input2.trim()
+    if (!text) return
+    setInput2('')
+    setMsgs2(m => [...m, { role: 'user', text }])
+    setTyping2(true)
+    try {
+      const res = await fetch(`${API}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cliente_id: clienteId, mensaje: text }),
+      })
+      const data = await res.json()
+      setMsgs2(m => [...m, { role: 'bot', text: data.respuesta || 'No pude procesar tu mensaje. Intentá de nuevo.' }])
+    } catch {
+      setMsgs2(m => [...m, { role: 'bot', text: 'Hubo un error de conexión. Intentá de nuevo.' }])
+    } finally {
+      setTyping2(false)
+    }
+  }
+
+  function handleKey2(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg2() }
+  }
+
   async function cargarMascotas() {
     setLoadingMascotas(true)
     try {
@@ -258,6 +291,7 @@ export default function Inicio() {
           {navBtn('home', 'Inicio', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>)}
           {navBtn('registrar', 'Registrar mascota', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>)}
           {navBtn('mascotas', 'Mis mascotas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>)}
+          {navBtn('chat', 'Turnos / Chat', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>)}
         </nav>
 
         {/* Logout */}
@@ -422,10 +456,65 @@ export default function Inicio() {
           </div>
         )}
 
+        {/* CHAT */}
+        {view === 'chat' && (
+          <div style={{ padding: '48px 40px' }}>
+            <div style={{ marginBottom: 32 }}>
+              <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Turnos / Chat</h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Hablá con nuestro asistente para agendar, reprogramar o cancelar turnos</p>
+            </div>
+            <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 24, maxWidth: 680, overflow: 'hidden' }}>
+              {/* Header */}
+              <div style={{ background: 'linear-gradient(135deg, var(--navy), #1a5a4a)', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 28 }}>🐾</span>
+                <div>
+                  <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'white', fontSize: '0.95rem' }}>Asistente VetFlow</div>
+                  <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Turnos · 24/7</div>
+                </div>
+                <div style={{ marginLeft: 'auto', width: 8, height: 8, borderRadius: '50%', background: '#4ADE80', boxShadow: '0 0 6px #4ADE80', animation: 'pulse 2s infinite' }} />
+              </div>
+              {/* Mensajes */}
+              <div style={{ minHeight: 400, maxHeight: 480, overflowY: 'auto', padding: '16px 14px' }}>
+                {msgs2.map((m, i) => <ChatBubble key={i} msg={m} />)}
+                {typing2 && (
+                  <div style={{ display: 'flex', gap: 5, padding: '10px 14px', alignItems: 'center' }}>
+                    {[0, 0.15, 0.3].map((d, i) => (
+                      <span key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--teal)', display: 'inline-block', animation: `dot 1s ease-in-out ${d}s infinite` }} />
+                    ))}
+                  </div>
+                )}
+                <div ref={bottomRef2} />
+              </div>
+              {/* Input */}
+              <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10 }}>
+                <input
+                  value={input2} onChange={e => setInput2(e.target.value)} onKeyDown={handleKey2}
+                  placeholder="Escribí tu mensaje..."
+                  style={{
+                    flex: 1, padding: '10px 14px', border: '1.5px solid rgba(15,157,126,0.2)',
+                    borderRadius: 100, fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem',
+                    color: 'var(--text)', outline: 'none', background: 'var(--cream)',
+                  }}
+                />
+                <button onClick={sendMsg2} style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--teal), var(--teal-mid))',
+                  border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, boxShadow: '0 4px 12px rgba(15,157,126,0.3)',
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* Chat widget flotante */}
-      <ChatWidget clienteId={clienteId} nombre={nombre.split(' ')[0] || 'usuario'} />
+      {view !== 'chat' && <ChatWidget clienteId={clienteId} nombre={nombre.split(' ')[0] || 'usuario'} />}
     </div>
   )
 }

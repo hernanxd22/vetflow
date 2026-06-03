@@ -1,0 +1,330 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "registro",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-336, -128],
+      "id": "f668969d-b9d4-43e7-9cd5-e475da06b09e",
+      "name": "Webhook Registro",
+      "webhookId": "registro"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "login",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-336, 256],
+      "id": "login-webhook-id",
+      "name": "Webhook Login",
+      "webhookId": "login"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mascotas",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-336, 640],
+      "id": "mascotas-webhook-id",
+      "name": "Webhook Mascotas",
+      "webhookId": "mascotas"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "12f8797f-cf69-4a1d-b1b3-4f7eb6cefade",
+              "leftValue": "={{ $json.body.nombre }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "name": "filter.operator.equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-96, -128],
+      "id": "d36d2d41-fc70-4ec5-ada0-4f91c5c1240d",
+      "name": "If Registro Valido"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO clientes (nombre, apellido, dni, telefono)\nVALUES (\n  '{{ $json.body.nombre }}',\n  '{{ $json.body.apellido }}',\n  '{{ $json.body.dni }}',\n  '{{ $json.body.telefono }}'\n)\nON CONFLICT (dni) DO UPDATE SET\n  nombre = EXCLUDED.nombre,\n  apellido = EXCLUDED.apellido,\n  telefono = EXCLUDED.telefono\nRETURNING id, nombre, apellido, dni;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [192, -256],
+      "id": "48b3e66f-ceb1-4bcf-bdd4-b5418f952f38",
+      "name": "Insertar Cliente",
+      "credentials": { "postgres": { "id": "NyMLNz8IN0o5KoAM", "name": "Postgres account" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO usuarios (cliente_id, username, password_hash)\nVALUES (\n  {{ $('Insertar Cliente').item.json.id }},\n  '{{ $json.body.username }}',\n  '{{ $json.body.password }}'\n)\nON CONFLICT (username) DO NOTHING\nRETURNING id, cliente_id, username;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [448, -256],
+      "id": "e1dee8f8-9e81-4827-a087-b4d6794c7dd5",
+      "name": "Insertar Usuario",
+      "credentials": { "postgres": { "id": "NyMLNz8IN0o5KoAM", "name": "Postgres account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"mensaje\": \"Registro exitoso\", \"cliente_id\": \"{{ $('Insertar Cliente').item.json.id }}\", \"nombre\": \"{{ $('Insertar Cliente').item.json.nombre }}\", \"apellido\": \"{{ $('Insertar Cliente').item.json.apellido }}\", \"dni\": \"{{ $('Insertar Cliente').item.json.dni }}\" }",
+        "options": { "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] } }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [768, -256],
+      "id": "c3a686d0-4db3-41c3-914a-c7016cebc9b3",
+      "name": "Respuesta Registro OK"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT u.cliente_id, u.password_hash,\n       c.nombre, c.apellido, c.dni, c.telefono\nFROM usuarios u\nJOIN clientes c ON c.id = u.cliente_id\nWHERE u.username = '{{ $json.body.username }}'\nAND u.password_hash = '{{ $json.body.password }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [192, 256],
+      "id": "bad2590e-92f9-4aa9-9436-f5dc6b2729cb",
+      "name": "Buscar Usuario Login",
+      "credentials": { "postgres": { "id": "NyMLNz8IN0o5KoAM", "name": "Postgres account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "3a127ae2-244d-41cd-a588-59b0b3089688",
+              "leftValue": "={{ $json.cliente_id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "name": "filter.operator.equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [400, 256],
+      "id": "19a89582-8a0a-431f-a352-672cf34b3c3b",
+      "name": "If Login Valido"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"mensaje\": \"Login exitoso\",\n  \"cliente_id\": \"{{ $json.cliente_id }}\",\n  \"nombre\": \"{{ $json.nombre }}\",\n  \"apellido\": \"{{ $json.apellido }}\",\n  \"dni\": \"{{ $json.dni }}\"\n}",
+        "options": { "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] } }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [688, 256],
+      "id": "2854b1b5-2e8e-434b-96de-0bb1b7a66cbd",
+      "name": "Respuesta Login OK"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Usuario o contraseña incorrectos\" }",
+        "options": { "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] } }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [704, 400],
+      "id": "043bfe84-7505-4e82-be15-07de611ffaea",
+      "name": "Respuesta Login Error"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "mascotas-accion-check",
+              "leftValue": "={{ $json.body.accion }}",
+              "rightValue": "registrar_mascota",
+              "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [64, 640],
+      "id": "mascotas-if-registrar",
+      "name": "If Registrar Mascota"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO mascotas (cliente_id, nombre, especie, raza, fecha_nacimiento, peso, notas_medicas)\nVALUES (\n  {{ $json.body.cliente_id }},\n  '{{ $json.body.nombre }}',\n  '{{ $json.body.especie }}',\n  '{{ $json.body.raza }}',\n  {{ $json.body.fecha_nacimiento ? \"'\" + $json.body.fecha_nacimiento + \"'\" : 'NULL' }},\n  {{ $json.body.peso || 'NULL' }},\n  '{{ $json.body.notas_medicas }}'\n)\nRETURNING id, cliente_id, nombre, especie, raza;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [256, 640],
+      "id": "mascota-insert",
+      "name": "Insertar Mascota",
+      "credentials": { "postgres": { "id": "NyMLNz8IN0o5KoAM", "name": "Postgres account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"mensaje\": \"Mascota registrada\", \"id\": \"{{ $('Insertar Mascota').item.json.id }}\", \"nombre\": \"{{ $('Insertar Mascota').item.json.nombre }}\", \"especie\": \"{{ $('Insertar Mascota').item.json.especie }}\" }",
+        "options": { "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] } }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [576, 640],
+      "id": "mascota-ok",
+      "name": "Respuesta Mascota OK"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "mascotas-list-check",
+              "leftValue": "={{ $json.body.accion }}",
+              "rightValue": "listar_mascotas",
+              "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [64, 864],
+      "id": "mascotas-if-listar",
+      "name": "If Listar Mascotas"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, cliente_id, nombre, especie, raza, fecha_nacimiento, peso, notas_medicas\nFROM mascotas\nWHERE cliente_id = {{ $json.body.cliente_id }}\nORDER BY created_at DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [256, 864],
+      "id": "mascota-list",
+      "name": "Listar Mascotas",
+      "credentials": { "postgres": { "id": "NyMLNz8IN0o5KoAM", "name": "Postgres account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Listar Mascotas').all()) }}",
+        "options": { "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] } }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [576, 864],
+      "id": "mascota-list-ok",
+      "name": "Respuesta Lista Mascotas"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Acción no reconocida para mascotas\" }",
+        "options": { "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] } }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [576, 1024],
+      "id": "mascota-error",
+      "name": "Respuesta Mascota Error"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Registro": {
+      "main": [[{ "node": "If Registro Valido", "type": "main", "index": 0 }]]
+    },
+    "If Registro Valido": {
+      "main": [
+        [{ "node": "Insertar Cliente", "type": "main", "index": 0 }],
+        [{ "node": "Respuesta Login Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Insertar Cliente": {
+      "main": [[{ "node": "Insertar Usuario", "type": "main", "index": 0 }]]
+    },
+    "Insertar Usuario": {
+      "main": [[{ "node": "Respuesta Registro OK", "type": "main", "index": 0 }]]
+    },
+    "Webhook Login": {
+      "main": [[{ "node": "Buscar Usuario Login", "type": "main", "index": 0 }]]
+    },
+    "Buscar Usuario Login": {
+      "main": [[{ "node": "If Login Valido", "type": "main", "index": 0 }]]
+    },
+    "If Login Valido": {
+      "main": [
+        [{ "node": "Respuesta Login OK", "type": "main", "index": 0 }],
+        [{ "node": "Respuesta Login Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook Mascotas": {
+      "main": [[{ "node": "If Registrar Mascota", "type": "main", "index": 0 }]]
+    },
+    "If Registrar Mascota": {
+      "main": [
+        [{ "node": "Insertar Mascota", "type": "main", "index": 0 }],
+        [{ "node": "If Listar Mascotas", "type": "main", "index": 0 }]
+      ]
+    },
+    "Insertar Mascota": {
+      "main": [[{ "node": "Respuesta Mascota OK", "type": "main", "index": 0 }]]
+    },
+    "If Listar Mascotas": {
+      "main": [
+        [{ "node": "Listar Mascotas", "type": "main", "index": 0 }],
+        [{ "node": "Respuesta Mascota Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Listar Mascotas": {
+      "main": [[{ "node": "Respuesta Lista Mascotas", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+  "versionId": "new-auth-mascotas-v1",
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "f107b2a004d026315b55c7606b549f9003a626f56317ab9dba88fdeebdc0b61f" },
+  "id": "SrDFRhRo55vrbGPv",
+  "tags": []
+}
