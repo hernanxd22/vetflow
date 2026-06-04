@@ -4,6 +4,7 @@ from app.modules.chat.service import enviar_mensaje
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
+# router.py
 @router.post("/", response_model=ChatResponse)
-def chat(data: ChatRequest):
-    return enviar_mensaje(data)
+async def chat(data: ChatRequest):  # agregar async
+    return await enviar_mensaje(data)  # agregar await
