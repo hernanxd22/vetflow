@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     DB_NAME: str = "proyec1"
     DB_USER: str = "postgres"
     DB_PASSWORD: str = ""
+    N8N_WEBHOOK_URL: str = "" 
 
     def get_database_url(self) -> str:
         if self.DATABASE_URL:
