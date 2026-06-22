@@ -13,6 +13,7 @@ class Cliente(Base):
     telefono   = Column(String(20), nullable=True)
     username   = Column(String(50), unique=True, nullable=False)
     password   = Column(String(255), nullable=False)
+    rol        = Column(String(20), nullable=False, default="cliente")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     mascotas = relationship("Mascota", back_populates="cliente")

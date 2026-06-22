@@ -35,6 +35,7 @@ export default function Login() {
       sessionStorage.setItem('nombre', data.nombre)
       sessionStorage.setItem('apellido', data.apellido)
       sessionStorage.setItem('dni', data.dni)
+      sessionStorage.setItem('rol', data.rol)
       navigate('/inicio')
     } catch (err: any) {
       setApiError(err.message)

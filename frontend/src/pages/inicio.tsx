@@ -9,7 +9,7 @@ type Mascota = {
   fecha_nacimiento?: string; peso?: number; notas_medicas?: string
 }
 type ChatMsg = { role: 'user' | 'bot'; text: string }
-type View = 'home' | 'registrar' | 'mascotas' | 'chat'
+type View = 'home' | 'registrar' | 'mascotas' | 'chat' | 'citas' | 'admin'
 
 // ─── Emoji helper ─────────────────────────────────────────
 const emojis: Record<string, string> = { perro: '🐶', gato: '🐱', conejo: '🐰', pajaro: '🐦', hamster: '🐹', otro: '🐾' }
@@ -34,7 +34,7 @@ function ChatBubble({ msg }: { msg: ChatMsg }) {
         maxWidth: '78%', padding: '10px 14px', borderRadius: isBot ? '4px 18px 18px 18px' : '18px 4px 18px 18px',
         background: isBot ? 'var(--teal-light)' : 'var(--teal)',
         color: isBot ? 'var(--text)' : 'white', fontSize: '0.9rem', lineHeight: 1.5,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.07)', whiteSpace: 'pre-line',
       }}>
         {msg.text}
       </div>
@@ -155,6 +155,7 @@ export default function Inicio() {
   const clienteId = sessionStorage.getItem('cliente_id') || ''
   const nombre = sessionStorage.getItem('nombre') || ''
   const apellido = sessionStorage.getItem('apellido') || ''
+  const rol = sessionStorage.getItem('rol') || ''
 
   useEffect(() => { if (!clienteId) navigate('/login') }, [clienteId, navigate])
 
@@ -171,6 +172,22 @@ export default function Inicio() {
   const [mNotas, setMNotas] = useState('')
   const [formMsg, setFormMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // Citas
+  type CitaCliente = { id: number; fecha: string; hora: string; estado: string; mascota_nombre: string }
+  type CitaAdmin = CitaCliente & { cliente_nombre: string }
+  const [citas, setCitas] = useState<CitaCliente[]>([])
+  const [loadingCitas, setLoadingCitas] = useState(false)
+  const [adminCitas, setAdminCitas] = useState<CitaAdmin[]>([])
+  const [loadingAdmin, setLoadingAdmin] = useState(false)
+  const [weekStart, setWeekStart] = useState(() => {
+    const d = new Date()
+    const day = d.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+    d.setDate(d.getDate() + diff)
+    d.setHours(0, 0, 0, 0)
+    return d
+  })
 
   // Chat view state
   const [msgs2, setMsgs2] = useState<ChatMsg[]>([{ role: 'bot', text: `¡Hola ${nombre.split(' ')[0] || 'usuario'}! 🐾 ¿En qué puedo ayudarte hoy? Podés pedirme agendar, reprogramar o cancelar un turno.` }])
@@ -215,9 +232,31 @@ export default function Inicio() {
     finally { setLoadingMascotas(false) }
   }
 
+  async function cargarCitas() {
+    setLoadingCitas(true)
+    try {
+      const res = await fetch(`${API}/citas/?cliente_id=${clienteId}`)
+      const data = await res.json()
+      setCitas(Array.isArray(data) ? data : [])
+    } catch { setCitas([]) }
+    finally { setLoadingCitas(false) }
+  }
+
+  async function cargarAdminCitas() {
+    setLoadingAdmin(true)
+    try {
+      const res = await fetch(`${API}/citas/admin`)
+      const data = await res.json()
+      setAdminCitas(Array.isArray(data) ? data : [])
+    } catch { setAdminCitas([]) }
+    finally { setLoadingAdmin(false) }
+  }
+
   function switchView(v: View) {
     setView(v)
     if (v === 'mascotas') cargarMascotas()
+    if (v === 'citas') cargarCitas()
+    if (v === 'admin') cargarAdminCitas()
   }
 
   async function handleGuardar(e: React.FormEvent) {
@@ -299,6 +338,8 @@ export default function Inicio() {
           {navBtn('registrar', 'Registrar mascota', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>)}
           {navBtn('mascotas', 'Mis mascotas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>)}
           {navBtn('chat', 'Turnos / Chat', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>)}
+          {navBtn('citas', 'Mis citas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
+          {rol === 'admin' && navBtn('admin', 'Admin', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>)}
         </nav>
 
         {/* Logout */}
@@ -515,6 +556,137 @@ export default function Inicio() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* CITAS */}
+        {view === 'citas' && (
+          <div style={{ padding: '48px 40px' }}>
+            <div style={{ marginBottom: 32 }}>
+              <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Mis citas</h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Turnos confirmados de tus mascotas</p>
+            </div>
+
+            {loadingCitas ? <LoadingDots /> : citas.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '72px 24px', color: 'var(--muted)' }}>
+                <span style={{ fontSize: 60, marginBottom: 18, display: 'block', opacity: 0.5 }}>📅</span>
+                <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>No tenés citas confirmadas</h4>
+                <p style={{ fontSize: '0.88rem', lineHeight: 1.6 }}>Usá el chat de turnos para agendar una cita con el asistente.</p>
+              </div>
+            ) : (
+              <>
+                <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--teal-light)', borderBottom: '1px solid var(--border)' }}>
+                        {['Fecha', 'Hora', 'Mascota', 'Estado'].map(h => (
+                          <th key={h} style={{ padding: '14px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--teal-dark)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {citas.map(c => (
+                        <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)', fontWeight: 500 }}>{new Date(c.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                          <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)' }}>{c.hora.slice(0, 5)}</td>
+                          <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)', fontWeight: 500 }}>{c.mascota_nombre}</td>
+                          <td style={{ padding: '14px 20px' }}>
+                            <span style={{ background: 'var(--teal-light)', color: 'var(--teal-dark)', fontSize: '0.78rem', fontWeight: 600, padding: '4px 12px', borderRadius: 100, display: 'inline-block' }}>{c.estado}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Horarios de atención */}
+                <div style={{ marginTop: 48 }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--teal)', marginBottom: 16 }}>Horarios de atención</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
+                    <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                      <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #FFD54F, #FFB300)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                      </div>
+                      <div>
+                        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Mañana</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--muted)', lineHeight: 1.6 }}>Lunes a Viernes<br/>8:00 – 13:00</div>
+                      </div>
+                    </div>
+                    <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                      <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #7C4DFF, #536DFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                      </div>
+                      <div>
+                        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Tarde</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--muted)', lineHeight: 1.6 }}>Lunes a Viernes<br/>17:00 – 21:00</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ADMIN */}
+        {view === 'admin' && (
+          <div style={{ padding: '48px 40px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+              <div>
+                <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Calendario de citas</h3>
+                <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Todas las citas confirmadas</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button onClick={() => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })} style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)', minWidth: 140, textAlign: 'center' }}>
+                  {(() => {
+                    const end = new Date(weekStart)
+                    end.setDate(end.getDate() + 6)
+                    const fmt = (d: Date) => d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+                    return `${fmt(weekStart)} – ${fmt(end)}`
+                  })()}
+                </span>
+                <button onClick={() => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })} style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {loadingAdmin ? <LoadingDots /> : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10 }}>
+                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dia, i) => {
+                  const date = new Date(weekStart)
+                  date.setDate(date.getDate() + i)
+                  const dateStr = date.toISOString().slice(0, 10)
+                  const dayCitas = adminCitas.filter(c => c.fecha === dateStr)
+                  const isToday = new Date().toISOString().slice(0, 10) === dateStr
+
+                  return (
+                    <div key={dia} style={{ background: 'white', border: isToday ? '2px solid var(--teal)' : '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+                      <div style={{ background: isToday ? 'var(--teal)' : 'var(--teal-light)', padding: '10px 12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: isToday ? 'white' : 'var(--teal-dark)' }}>{dia}</div>
+                        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.15rem', fontWeight: 700, color: isToday ? 'white' : 'var(--teal-dark)', marginTop: 2 }}>{date.getDate()}</div>
+                      </div>
+                      <div style={{ padding: '8px', minHeight: 120 }}>
+                        {dayCitas.length === 0 ? (
+                          <div style={{ padding: '16px 8px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--muted)' }}>Sin citas</div>
+                        ) : (
+                          dayCitas.map(c => (
+                            <div key={c.id} style={{ padding: '8px 10px', marginBottom: 6, background: 'var(--cream)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                              <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--teal-dark)', marginBottom: 3 }}>{c.hora.slice(0, 5)}</div>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text)', marginBottom: 1 }}>{c.cliente_nombre}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>🐾 {c.mascota_nombre}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 

@@ -19,3 +19,4 @@ class AuthResponse(BaseModel):
     apellido:   str
     dni:        str
     username:   str
+    rol:        str

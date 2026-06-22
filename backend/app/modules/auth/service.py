@@ -22,7 +22,8 @@ class AuthService:
             )
             return AuthResponse(
                 cliente_id=cliente.id, nombre=cliente.nombre,
-                apellido=cliente.apellido, dni=cliente.dni, username=cliente.username
+                apellido=cliente.apellido, dni=cliente.dni, username=cliente.username,
+                rol=cliente.rol
             )
 
     def login(self, data: LoginRequest, uow: UnitOfWork) -> AuthResponse:
@@ -32,7 +33,8 @@ class AuthService:
 
         return AuthResponse(
             cliente_id=cliente.id, nombre=cliente.nombre,
-            apellido=cliente.apellido, dni=cliente.dni, username=cliente.username
+            apellido=cliente.apellido, dni=cliente.dni, username=cliente.username,
+            rol=cliente.rol
         )
 
 auth_service = AuthService()
