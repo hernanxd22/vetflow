@@ -10,7 +10,8 @@ def get_citas_cliente(cliente_id: int, db: Session) -> List[CitaClienteResponse]
         FROM citas c
         JOIN mascotas m ON c.mascota_id = m.id
         WHERE c.cliente_id = :cliente_id AND c.estado = 'confirmado'
-        ORDER BY c.fecha DESC, c.hora ASC
+        AND (c.fecha > CURRENT_DATE OR (c.fecha = CURRENT_DATE AND c.hora >= CURRENT_TIME AT TIME ZONE 'America/Argentina/Buenos_Aires'))
+        ORDER BY c.fecha ASC, c.hora ASC
     """)
     result = db.execute(sql, {"cliente_id": cliente_id})
     rows = result.fetchall()
