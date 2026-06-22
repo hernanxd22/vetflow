@@ -162,6 +162,10 @@ export default function Inicio() {
   const [view, setView] = useState<View>('home')
   const [mascotas, setMascotas] = useState<Mascota[]>([])
   const [loadingMascotas, setLoadingMascotas] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState({ nombre: '', especie: '', raza: '', fecha_nacimiento: '', peso: '', notas_medicas: '' })
+  const [editMsg, setEditMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
 
   // Form mascota
   const [mNombre, setMNombre] = useState('')
@@ -230,6 +234,54 @@ export default function Inicio() {
       setMascotas(Array.isArray(data) ? data : [])
     } catch { setMascotas([]) }
     finally { setLoadingMascotas(false) }
+  }
+
+  function startEdit(m: Mascota) {
+    setEditForm({
+      nombre: m.nombre,
+      especie: m.especie,
+      raza: m.raza || '',
+      fecha_nacimiento: m.fecha_nacimiento || '',
+      peso: m.peso ? String(m.peso) : '',
+      notas_medicas: m.notas_medicas || '',
+    })
+    setEditingId(m.id)
+    setEditMsg(null)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditMsg(null)
+  }
+
+  async function saveEdit(mascotaId: number) {
+    setEditMsg(null)
+    if (!editForm.nombre.trim() || !editForm.especie) {
+      setEditMsg({ type: 'error', text: 'El nombre y la especie son obligatorios.' })
+      return
+    }
+    setEditSaving(true)
+    try {
+      const res = await fetch(`${API}/mascotas/${mascotaId}?cliente_id=${clienteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: editForm.nombre.trim(),
+          especie: editForm.especie,
+          raza: editForm.raza || null,
+          fecha_nacimiento: editForm.fecha_nacimiento || null,
+          peso: editForm.peso ? parseFloat(editForm.peso) : null,
+          notas_medicas: editForm.notas_medicas || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al guardar')
+      setEditMsg({ type: 'ok', text: 'Mascota actualizada' })
+      setEditingId(null)
+      cargarMascotas()
+    } catch (err: any) {
+      setEditMsg({ type: 'error', text: err.message })
+    } finally { setEditSaving(false) }
   }
 
   async function cargarCitas() {
@@ -485,20 +537,62 @@ export default function Inicio() {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
-                {mascotas.map((m) => (
-                  <div key={m.id} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', position: 'relative', overflow: 'hidden' }}>
+                {mascotas.map((m) => {
+                  const isEditing = editingId === m.id
+                  return (
+                  <div key={m.id} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: isEditing ? '20px 24px 24px' : '28px 24px', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--teal), var(--teal-mid))' }} />
-                    <span style={{ fontSize: 36, marginBottom: 14, display: 'block' }}>{emojis[m.especie] || '🐾'}</span>
-                    <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{m.nombre}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--teal)', fontWeight: 500, textTransform: 'capitalize', background: 'var(--teal-light)', display: 'inline-block', padding: '3px 10px', borderRadius: 100, marginBottom: 12 }}>{m.especie || 'mascota'}</div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: 1.8 }}>
-                      {m.raza && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Raza:</strong> {m.raza}</div>}
-                      {m.fecha_nacimiento && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Nacimiento:</strong> {new Date(m.fecha_nacimiento).toLocaleDateString('es-AR')}</div>}
-                      {m.peso && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Peso:</strong> {m.peso} kg</div>}
-                      {m.notas_medicas && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Notas:</strong> {m.notas_medicas}</div>}
-                    </div>
+
+                    {isEditing ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <span style={{ fontSize: 28, display: 'block' }}>{emojis[m.especie] || '🐾'}</span>
+                        <input style={inputStyle} type="text" placeholder="Nombre" value={editForm.nombre} onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))} />
+                        <select style={inputStyle} value={editForm.especie} onChange={e => setEditForm(f => ({ ...f, especie: e.target.value }))}>
+                          <option value="">Especie</option>
+                          <option value="perro">🐶 Perro</option>
+                          <option value="gato">🐱 Gato</option>
+                          <option value="conejo">🐰 Conejo</option>
+                          <option value="pajaro">🐦 Pájaro</option>
+                          <option value="hamster">🐹 Hámster</option>
+                          <option value="otro">Otro</option>
+                        </select>
+                        <input style={inputStyle} type="text" placeholder="Raza" value={editForm.raza} onChange={e => setEditForm(f => ({ ...f, raza: e.target.value }))} />
+                        <input style={inputStyle} type="date" value={editForm.fecha_nacimiento} onChange={e => setEditForm(f => ({ ...f, fecha_nacimiento: e.target.value }))} />
+                        <input style={inputStyle} type="number" placeholder="Peso (kg)" step="0.1" min="0" value={editForm.peso} onChange={e => setEditForm(f => ({ ...f, peso: e.target.value }))} />
+                        <input style={inputStyle} type="text" placeholder="Notas médicas" value={editForm.notas_medicas} onChange={e => setEditForm(f => ({ ...f, notas_medicas: e.target.value }))} />
+                        {editMsg && (
+                          <div style={{ borderRadius: 10, padding: '8px 12px', fontSize: '0.8rem', background: editMsg.type === 'ok' ? 'var(--teal-light)' : '#fff5f5', border: `1px solid ${editMsg.type === 'ok' ? 'rgba(15,157,126,0.2)' : 'rgba(229,62,62,0.25)'}`, color: editMsg.type === 'ok' ? 'var(--teal-dark)' : 'var(--error)' }}>
+                            {editMsg.text}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                          <button onClick={() => saveEdit(m.id)} disabled={editSaving} style={{ flex: 1, background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-mid) 100%)', color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', fontWeight: 500, padding: '10px 16px', borderRadius: 100, border: 'none', cursor: editSaving ? 'not-allowed' : 'pointer', opacity: editSaving ? 0.6 : 1 }}>
+                            {editSaving ? 'Guardando...' : 'Guardar'}
+                          </button>
+                          <button onClick={cancelEdit} style={{ flex: 1, background: 'white', color: 'var(--muted)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', fontWeight: 500, padding: '10px 16px', borderRadius: 100, border: '1px solid var(--border)', cursor: 'pointer' }}>
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: 36, marginBottom: 14, display: 'block' }}>{emojis[m.especie] || '🐾'}</span>
+                        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{m.nombre}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--teal)', fontWeight: 500, textTransform: 'capitalize', background: 'var(--teal-light)', display: 'inline-block', padding: '3px 10px', borderRadius: 100, marginBottom: 12 }}>{m.especie || 'mascota'}</div>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: 1.8 }}>
+                          {m.raza && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Raza:</strong> {m.raza}</div>}
+                          {m.fecha_nacimiento && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Nacimiento:</strong> {new Date(m.fecha_nacimiento).toLocaleDateString('es-AR')}</div>}
+                          {m.peso && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Peso:</strong> {m.peso} kg</div>}
+                          {m.notas_medicas && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Notas:</strong> {m.notas_medicas}</div>}
+                        </div>
+                        <button onClick={() => startEdit(m)} style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--cream)', color: 'var(--teal-dark)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 500, padding: '7px 16px', borderRadius: 100, border: '1px solid rgba(15,157,126,0.2)', cursor: 'pointer' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          Editar
+                        </button>
+                      </>
+                    )}
                   </div>
-                ))}
+                )})}
               </div>
             )}
           </div>
