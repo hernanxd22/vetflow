@@ -9,7 +9,7 @@ type Mascota = {
   fecha_nacimiento?: string; peso?: number; notas_medicas?: string
 }
 type ChatMsg = { role: 'user' | 'bot'; text: string }
-type View = 'home' | 'registrar' | 'mascotas' | 'chat' | 'citas' | 'admin' | 'historial'
+type View = 'home' | 'registrar' | 'mascotas' | 'chat' | 'citas' | 'admin' | 'historial' | 'veterinarios'
 
 // ─── Emoji helper ─────────────────────────────────────────
 const emojis: Record<string, string> = { perro: '🐶', gato: '🐱', conejo: '🐰', pajaro: '🐦', hamster: '🐹', otro: '🐾' }
@@ -218,6 +218,16 @@ export default function Inicio() {
   const [typing2, setTyping2] = useState(false)
   const bottomRef2 = useRef<HTMLDivElement>(null)
 
+  // Veterinarios
+  type Veterinario = { id: number; nombre: string; apellido: string; dni: string; telefono: string | null; username: string; estado: string }
+  const [veterinarios, setVeterinarios] = useState<Veterinario[]>([])
+  const [loadingVeterinarios, setLoadingVeterinarios] = useState(false)
+  const [vetSearch, setVetSearch] = useState('')
+  const [editingVetId, setEditingVetId] = useState<number | null>(null)
+  const [vetEditForm, setVetEditForm] = useState({ telefono: '', estado: 'activo' })
+  const [vetEditMsg, setVetEditMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
+  const [vetSaving, setVetSaving] = useState(false)
+
   useEffect(() => { bottomRef2.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs2, typing2])
 
   async function sendMsg2() {
@@ -315,8 +325,52 @@ export default function Inicio() {
       const res = await fetch(url)
       const data = await res.json()
       setCitas(Array.isArray(data) ? data : [])
+      data.forEach((c: any) => console.log('DEBUG cita fecha:', typeof c.fecha, JSON.stringify(c.fecha), 'vs dateStr formato YYYY-MM-DD'))
     } catch { setCitas([]) }
     finally { setLoadingCitas(false) }
+  }
+
+  async function cargarVeterinarios() {
+    setLoadingVeterinarios(true)
+    try {
+      const res = await fetch(`${API}/veterinarios/?cliente_id=${clienteId}`)
+      const data = await res.json()
+      setVeterinarios(Array.isArray(data) ? data : [])
+    } catch { setVeterinarios([]) }
+    finally { setLoadingVeterinarios(false) }
+  }
+
+  function startEditVet(v: Veterinario) {
+    setEditingVetId(v.id)
+    setVetEditForm({ telefono: v.telefono || '', estado: v.estado })
+    setVetEditMsg(null)
+  }
+
+  function cancelEditVet() {
+    setEditingVetId(null)
+    setVetEditMsg(null)
+  }
+
+  async function saveEditVet(vetId: number) {
+    setVetSaving(true)
+    setVetEditMsg(null)
+    try {
+      const res = await fetch(`${API}/veterinarios/${vetId}?cliente_id=${clienteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telefono: vetEditForm.telefono || null,
+          estado: vetEditForm.estado,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Error al guardar')
+      setVetEditMsg({ type: 'ok', text: 'Veterinario actualizado' })
+      setEditingVetId(null)
+      cargarVeterinarios()
+    } catch (err: any) {
+      setVetEditMsg({ type: 'error', text: err.message })
+    } finally { setVetSaving(false) }
   }
 
 
@@ -392,7 +446,8 @@ export default function Inicio() {
     setCitasFiltroFecha('todas')
     if (v === 'mascotas') cargarMascotas()
     if (v === 'citas') cargarCitas()
-    if (v === 'admin') cargarCitas()
+    if (v === 'admin') { cargarCitas(); cargarMascotas(); cargarVeterinarios() }
+    if (v === 'veterinarios') cargarVeterinarios()
   }
 
   async function handleGuardar(e: React.FormEvent) {
@@ -501,6 +556,7 @@ export default function Inicio() {
           {rol === 'admin' && (
             <>
               {navBtn('mascotas', 'Mascotas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>)}
+              {navBtn('veterinarios', 'Veterinarios', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>)}
               {navBtn('admin', 'Calendario', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
             </>
           )}
@@ -1029,6 +1085,28 @@ export default function Inicio() {
         {/* ADMIN */}
         {view === 'admin' && (
           <div style={{ padding: '48px 40px' }}>
+            {/* ── Dashboard summary cards ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 36 }}>
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, #7C4DFF, #536DFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '2rem', fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{loadingVeterinarios ? '...' : veterinarios.length}</div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--muted)', marginTop: 4 }}>Veterinarios</div>
+                </div>
+              </div>
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, var(--teal), var(--teal-mid))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '2rem', fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{loadingMascotas ? '...' : mascotas.length}</div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--muted)', marginTop: 4 }}>Mascotas</div>
+                </div>
+              </div>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
               <div>
                 <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Calendario de citas</h3>
@@ -1084,6 +1162,133 @@ export default function Inicio() {
                   )
                 })}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* VETERINARIOS */}
+        {view === 'veterinarios' && (
+          <div style={{ padding: '48px 40px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+              <div>
+                <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Veterinarios</h3>
+                <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Personal de la clínica</p>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input value={vetSearch} onChange={e => setVetSearch(e.target.value)} placeholder="Buscar veterinario..."
+                  style={{ height: 42, padding: '0 16px 0 42px', borderRadius: 100, border: '1px solid var(--border)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', background: 'white', outline: 'none', width: 240 }} />
+              </div>
+            </div>
+
+            {loadingVeterinarios ? <LoadingDots /> : (
+              (() => {
+                const filtrados = veterinarios.filter(v =>
+                  `${v.nombre} ${v.apellido}`.toLowerCase().includes(vetSearch.toLowerCase())
+                )
+
+                if (veterinarios.length === 0) return (
+                  <div style={{ textAlign: 'center', padding: 80, background: 'white', borderRadius: 20, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>👨‍⚕️</div>
+                    <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>No hay veterinarios</div>
+                    <div style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Asigná el rol "veterinario" a un cliente desde la base de datos.</div>
+                  </div>
+                )
+
+                if (filtrados.length === 0) return (
+                  <div style={{ textAlign: 'center', padding: 60, background: 'white', borderRadius: 20, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '1rem', color: 'var(--muted)' }}>Sin resultados para "{vetSearch}"</div>
+                  </div>
+                )
+
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+                    {filtrados.map(v => {
+                      const isEditing = editingVetId === v.id
+                      return (
+                        <div key={v.id} style={{ background: 'white', border: isEditing ? '2px solid var(--teal)' : '1px solid var(--border)', borderRadius: 20, padding: 28, position: 'relative' }}>
+                          {/* Badge estado */}
+                          <span style={{
+                            position: 'absolute', top: 16, right: 16,
+                            fontSize: '0.6rem', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase',
+                            padding: '3px 10px', borderRadius: 100,
+                            background: v.estado === 'activo' ? 'rgba(27,191,160,0.12)' : 'rgba(150,150,150,0.12)',
+                            color: v.estado === 'activo' ? 'var(--teal)' : 'var(--muted)',
+                          }}>
+                            {v.estado}
+                          </span>
+
+                          {/* Avatar */}
+                          <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, #7C4DFF, #536DFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                            <span style={{ color: 'white', fontFamily: 'Syne, sans-serif', fontSize: '1.2rem', fontWeight: 700 }}>{v.nombre.charAt(0)}{v.apellido.charAt(0)}</span>
+                          </div>
+
+                          {isEditing ? (
+                            <>
+                              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', marginBottom: 18 }}>
+                                {v.nombre} {v.apellido}
+                              </div>
+                              <div style={{ marginBottom: 12 }}>
+                                <label style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Teléfono</label>
+                                <input value={vetEditForm.telefono} onChange={e => setVetEditForm(f => ({ ...f, telefono: e.target.value }))}
+                                  style={{ height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', width: '100%', outline: 'none' }} />
+                              </div>
+                              <div style={{ marginBottom: 18 }}>
+                                <label style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Estado</label>
+                                <select value={vetEditForm.estado} onChange={e => setVetEditForm(f => ({ ...f, estado: e.target.value }))}
+                                  style={{ height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', width: '100%', outline: 'none', background: 'white' }}>
+                                  <option value="activo">Activo</option>
+                                  <option value="desactivado">Desactivado</option>
+                                </select>
+                              </div>
+                              {vetEditMsg && (
+                                <div style={{ fontSize: '0.8rem', color: vetEditMsg.type === 'ok' ? 'var(--teal)' : '#E53935', marginBottom: 12, fontWeight: 500 }}>
+                                  {vetEditMsg.text}
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', gap: 10 }}>
+                                <button onClick={() => saveEditVet(v.id)} disabled={vetSaving}
+                                  style={{ flex: 1, height: 40, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--teal), var(--teal-mid))', color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer' }}>
+                                  {vetSaving ? 'Guardando...' : 'Guardar'}
+                                </button>
+                                <button onClick={cancelEditVet}
+                                  style={{ height: 40, padding: '0 18px', borderRadius: 10, border: '1px solid var(--border)', background: 'white', color: 'var(--muted)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', cursor: 'pointer' }}>
+                                  Cancelar
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+                                {v.nombre} {v.apellido}
+                              </div>
+                              <div style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: 2 }}>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <span style={{ fontWeight: 500, color: 'var(--text)', minWidth: 70 }}>DNI:</span>
+                                  <span>{v.dni}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <span style={{ fontWeight: 500, color: 'var(--text)', minWidth: 70 }}>Tel:</span>
+                                  <span>{v.telefono || '—'}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <span style={{ fontWeight: 500, color: 'var(--text)', minWidth: 70 }}>Usuario:</span>
+                                  <span>{v.username}</span>
+                                </div>
+                              </div>
+                              <button onClick={() => startEditVet(v)}
+                                style={{ marginTop: 20, height: 38, padding: '0 20px', borderRadius: 10, border: '1px solid var(--border)', background: 'white', color: 'var(--text)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Editar
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()
             )}
           </div>
         )}

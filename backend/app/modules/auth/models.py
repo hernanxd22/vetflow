@@ -14,6 +14,7 @@ class Cliente(Base):
     username   = Column(String(50), unique=True, nullable=False)
     password   = Column(String(255), nullable=False)
     rol        = Column(String(20), nullable=False, default="cliente")
+    estado     = Column(String(15), nullable=False, default="activo")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     mascotas = relationship("Mascota", back_populates="cliente")

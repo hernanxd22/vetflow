@@ -7,6 +7,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.chat.router import router as chat_router
 from app.modules.citas.router import router as citas_router
 from app.modules.historial.router import router as historial_router
+from app.modules.veterinarios.router import router as veterinarios_router
 from app.modules.auth.models import Cliente
 from app.modules.mascotas.models import Mascota
 from app.modules.historial.models import HistorialMedico
@@ -46,3 +47,4 @@ app.include_router(mascotas_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(citas_router, prefix="/api")
 app.include_router(historial_router, prefix="/api")
+app.include_router(veterinarios_router, prefix="/api")
