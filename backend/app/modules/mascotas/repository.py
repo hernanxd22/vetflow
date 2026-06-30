@@ -10,6 +10,9 @@ class MascotaRepository:
     def get_all_by_cliente(self, cliente_id: int) -> List[Mascota]:
         return self.db.query(Mascota).filter(Mascota.cliente_id == cliente_id).all()
 
+    def get_all(self) -> List[Mascota]:
+        return self.db.query(Mascota).order_by(Mascota.nombre).all()
+
     def get_by_id(self, mascota_id: int, cliente_id: int) -> Optional[Mascota]:
         return self.db.query(Mascota).filter(
             Mascota.id == mascota_id,

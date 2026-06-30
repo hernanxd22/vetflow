@@ -9,6 +9,10 @@ class MascotaService:
         mascotas = uow.mascotas.get_all_by_cliente(cliente_id)
         return [MascotaResponse.model_validate(m) for m in mascotas]
 
+    def get_all_mascotas(self, uow: UnitOfWork) -> List[MascotaResponse]:
+        mascotas = uow.mascotas.get_all()
+        return [MascotaResponse.model_validate(m) for m in mascotas]
+
     def create(self, cliente_id: int, data: MascotaCreate, uow: UnitOfWork) -> MascotaResponse:
         with uow:
             mascota = uow.mascotas.create(cliente_id, data)

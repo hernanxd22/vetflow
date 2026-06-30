@@ -7,8 +7,10 @@ class CitaClienteResponse(BaseModel):
     fecha: str
     hora: str
     estado: str
+    mascota_id: int
     mascota_nombre: str
 
 
 class CitaAdminResponse(CitaClienteResponse):
+    cliente_id: int
     cliente_nombre: str

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const API = 'https://proyec1-server.bxyea0.easypanel.host/api'
+const API = import.meta.env.VITE_API_URL || 'https://proyec1-server.bxyea0.easypanel.host/api'
 
 // ─── Types ───────────────────────────────────────────────
 type Mascota = {
@@ -9,7 +9,7 @@ type Mascota = {
   fecha_nacimiento?: string; peso?: number; notas_medicas?: string
 }
 type ChatMsg = { role: 'user' | 'bot'; text: string }
-type View = 'home' | 'registrar' | 'mascotas' | 'chat' | 'citas' | 'admin'
+type View = 'home' | 'registrar' | 'mascotas' | 'chat' | 'citas' | 'admin' | 'historial'
 
 // ─── Emoji helper ─────────────────────────────────────────
 const emojis: Record<string, string> = { perro: '🐶', gato: '🐱', conejo: '🐰', pajaro: '🐦', hamster: '🐹', otro: '🐾' }
@@ -161,6 +161,7 @@ export default function Inicio() {
 
   const [view, setView] = useState<View>('home')
   const [mascotas, setMascotas] = useState<Mascota[]>([])
+  const [mascotaSearch, setMascotaSearch] = useState('')
   const [loadingMascotas, setLoadingMascotas] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ nombre: '', especie: '', raza: '', fecha_nacimiento: '', peso: '', notas_medicas: '' })
@@ -178,12 +179,13 @@ export default function Inicio() {
   const [saving, setSaving] = useState(false)
 
   // Citas
-  type CitaCliente = { id: number; fecha: string; hora: string; estado: string; mascota_nombre: string }
-  type CitaAdmin = CitaCliente & { cliente_nombre: string }
-  const [citas, setCitas] = useState<CitaCliente[]>([])
+  type CitaCliente = { id: number; fecha: string; hora: string; estado: string; mascota_id: number; mascota_nombre: string }
+  type CitaAdmin = CitaCliente & { cliente_id: number; cliente_nombre: string }
+  const [citas, setCitas] = useState<(CitaCliente | CitaAdmin)[]>([])
   const [loadingCitas, setLoadingCitas] = useState(false)
-  const [adminCitas, setAdminCitas] = useState<CitaAdmin[]>([])
-  const [loadingAdmin, setLoadingAdmin] = useState(false)
+  const [citasFiltroTexto, setCitasFiltroTexto] = useState('')
+  const [citasFiltroEstado, setCitasFiltroEstado] = useState('todas')
+  const [citasFiltroFecha, setCitasFiltroFecha] = useState('todas')
   const [weekStart, setWeekStart] = useState(() => {
     const d = new Date()
     const day = d.getDay()
@@ -192,6 +194,23 @@ export default function Inicio() {
     d.setHours(0, 0, 0, 0)
     return d
   })
+
+  // Historial
+  type HistorialRegistro = { id: number; mascota_id: number; fecha: string; tipo: string; descripcion: string; diagnostico?: string; tratamiento?: string; notas?: string }
+  const [historialMascotaId, setHistorialMascotaId] = useState<number | null>(null)
+  const [historialMascotaNombre, setHistorialMascotaNombre] = useState('')
+  const [historialData, setHistorialData] = useState<HistorialRegistro[]>([])
+  const [loadingHistorial, setLoadingHistorial] = useState(false)
+  const [historialView, setHistorialView] = useState<'list' | 'detail' | 'form'>('list')
+  const [historialSelected, setHistorialSelected] = useState<HistorialRegistro | null>(null)
+  const [hTipo, setHTipo] = useState('consulta')
+  const [hFecha, setHFecha] = useState(() => new Date().toISOString().split('T')[0])
+  const [hDescripcion, setHDescripcion] = useState('')
+  const [hDiagnostico, setHDiagnostico] = useState('')
+  const [hTratamiento, setHTratamiento] = useState('')
+  const [hNotas, setHNotas] = useState('')
+  const [hMsg, setHMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
+  const [hSaving, setHSaving] = useState(false)
 
   // Chat view state
   const [msgs2, setMsgs2] = useState<ChatMsg[]>([{ role: 'bot', text: `¡Hola ${nombre.split(' ')[0] || 'usuario'}! 🐾 ¿En qué puedo ayudarte hoy? Podés pedirme agendar, reprogramar o cancelar un turno.` }])
@@ -229,7 +248,10 @@ export default function Inicio() {
   async function cargarMascotas() {
     setLoadingMascotas(true)
     try {
-      const res = await fetch(`${API}/mascotas/?cliente_id=${clienteId}`)
+      const url = (rol === 'veterinario' || rol === 'admin')
+        ? `${API}/mascotas/todas`
+        : `${API}/mascotas/?cliente_id=${clienteId}`
+      const res = await fetch(url)
       const data = await res.json()
       setMascotas(Array.isArray(data) ? data : [])
     } catch { setMascotas([]) }
@@ -287,28 +309,90 @@ export default function Inicio() {
   async function cargarCitas() {
     setLoadingCitas(true)
     try {
-      const res = await fetch(`${API}/citas/?cliente_id=${clienteId}`)
+      const url = rol === 'cliente'
+        ? `${API}/citas/?cliente_id=${clienteId}`
+        : `${API}/citas/admin`
+      const res = await fetch(url)
       const data = await res.json()
       setCitas(Array.isArray(data) ? data : [])
     } catch { setCitas([]) }
     finally { setLoadingCitas(false) }
   }
 
-  async function cargarAdminCitas() {
-    setLoadingAdmin(true)
+
+  function abrirHistorial(mascotaId: number, mascotaNombre: string) {
+    setHistorialMascotaId(mascotaId)
+    setHistorialMascotaNombre(mascotaNombre)
+    setHistorialView('list')
+    setHistorialSelected(null)
+    setView('historial')
+    cargarHistorialData(mascotaId)
+  }
+
+  async function cargarHistorialData(mascotaId: number) {
+    setLoadingHistorial(true)
     try {
-      const res = await fetch(`${API}/citas/admin`)
+      const res = await fetch(`${API}/mascotas/${mascotaId}/historial?cliente_id=${clienteId}`)
       const data = await res.json()
-      setAdminCitas(Array.isArray(data) ? data : [])
-    } catch { setAdminCitas([]) }
-    finally { setLoadingAdmin(false) }
+      setHistorialData(Array.isArray(data) ? data : [])
+    } catch { setHistorialData([]) }
+    finally { setLoadingHistorial(false) }
+  }
+
+  async function guardarHistorial(e: React.FormEvent) {
+    e.preventDefault()
+    setHMsg(null)
+    if (!hDescripcion.trim()) { setHMsg({ type: 'error', text: 'La descripción es obligatoria.' }); return }
+    if (!historialMascotaId) return
+    setHSaving(true)
+    try {
+      const res = await fetch(`${API}/mascotas/${historialMascotaId}/historial?cliente_id=${clienteId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fecha: hFecha,
+          tipo: hTipo,
+          descripcion: hDescripcion.trim(),
+          diagnostico: hDiagnostico || null,
+          tratamiento: hTratamiento || null,
+          notas: hNotas || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Error al guardar')
+      setHFecha(new Date().toISOString().split('T')[0])
+      setHTipo('consulta')
+      setHDescripcion('')
+      setHDiagnostico('')
+      setHTratamiento('')
+      setHNotas('')
+      setHMsg(null)
+      setHistorialView('list')
+      cargarHistorialData(historialMascotaId)
+    } catch (err: any) {
+      setHMsg({ type: 'error', text: err.message })
+    } finally { setHSaving(false) }
+  }
+
+  async function eliminarRegistroHistorial(id: number) {
+    if (!confirm('¿Eliminar este registro del historial?')) return
+    try {
+      const res = await fetch(`${API}/historial/${id}?cliente_id=${clienteId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Error al eliminar')
+      if (historialSelected?.id === id) { setHistorialSelected(null); setHistorialView('list') }
+      if (historialMascotaId) cargarHistorialData(historialMascotaId)
+    } catch { /* ignore */ }
   }
 
   function switchView(v: View) {
     setView(v)
+    setMascotaSearch('')
+    setCitasFiltroTexto('')
+    setCitasFiltroEstado('todas')
+    setCitasFiltroFecha('todas')
     if (v === 'mascotas') cargarMascotas()
     if (v === 'citas') cargarCitas()
-    if (v === 'admin') cargarAdminCitas()
+    if (v === 'admin') cargarCitas()
   }
 
   async function handleGuardar(e: React.FormEvent) {
@@ -380,18 +464,46 @@ export default function Inicio() {
         {/* User */}
         <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.07)', position: 'relative' }}>
           <div style={{ fontSize: '0.68rem', fontWeight: 600, letterSpacing: '1.8px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 5 }}>Bienvenido</div>
-          <div style={{ fontSize: '1rem', fontWeight: 500, color: 'white' }}>{[nombre, apellido].filter(Boolean).join(' ') || 'Usuario'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: '1rem', fontWeight: 500, color: 'white' }}>{[nombre, apellido].filter(Boolean).join(' ') || 'Usuario'}</div>
+            <span style={{
+              fontSize: '0.6rem', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase',
+              padding: '2px 8px', borderRadius: 100,
+              background: rol === 'admin' ? 'rgba(255,215,0,0.15)' : rol === 'veterinario' ? 'rgba(124,77,255,0.15)' : 'rgba(27,191,160,0.15)',
+              color: rol === 'admin' ? '#FFD54F' : rol === 'veterinario' ? '#B388FF' : 'var(--teal-mid)',
+            }}>
+              {rol === 'admin' ? 'Admin' : rol === 'veterinario' ? 'Veterinario' : 'Cliente'}
+            </span>
+          </div>
         </div>
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '16px 12px', position: 'relative' }}>
           <div style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', padding: '8px 12px 6px' }}>Menú</div>
           {navBtn('home', 'Inicio', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>)}
-          {rol !== 'admin' && navBtn('registrar', 'Registrar mascota', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>)}
-          {rol !== 'admin' && navBtn('mascotas', 'Mis mascotas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>)}
-          {rol !== 'admin' && navBtn('chat', 'Turnos / Chat', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>)}
-          {rol !== 'admin' && navBtn('citas', 'Mis citas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
-          {rol === 'admin' && navBtn('admin', 'Admin', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>)}
+
+          {rol === 'cliente' && (
+            <>
+              {navBtn('registrar', 'Registrar mascota', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>)}
+              {navBtn('mascotas', 'Mis mascotas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>)}
+              {navBtn('chat', 'Turnos / Chat', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>)}
+              {navBtn('citas', 'Mis citas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
+            </>
+          )}
+
+          {rol === 'veterinario' && (
+            <>
+              {navBtn('mascotas', 'Mascotas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>)}
+              {navBtn('citas', 'Mis citas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
+            </>
+          )}
+
+          {rol === 'admin' && (
+            <>
+              {navBtn('mascotas', 'Mascotas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>)}
+              {navBtn('admin', 'Calendario', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
+            </>
+          )}
         </nav>
 
         {/* Logout */}
@@ -424,9 +536,16 @@ export default function Inicio() {
                 Hola, <span style={{ color: 'var(--teal-mid)', fontWeight: 500 }}>{nombre.split(' ')[0] || 'usuario'}</span>. Gestioná los turnos de tus mascotas en segundos.
               </p>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', position: 'relative' }}>
-                <button onClick={() => switchView('registrar')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'white', color: 'var(--navy)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.95rem', fontWeight: 500, padding: '14px 30px', borderRadius: 100, border: 'none', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
-                  + Registrar mascota
-                </button>
+                {rol === 'cliente' && (
+                  <button onClick={() => switchView('registrar')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'white', color: 'var(--navy)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.95rem', fontWeight: 500, padding: '14px 30px', borderRadius: 100, border: 'none', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
+                    + Registrar mascota
+                  </button>
+                )}
+                {(rol === 'veterinario' || rol === 'admin') && (
+                  <button onClick={() => switchView('mascotas')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'white', color: 'var(--navy)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.95rem', fontWeight: 500, padding: '14px 30px', borderRadius: 100, border: 'none', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
+                    Ver mascotas
+                  </button>
+                )}
               </div>
             </section>
 
@@ -516,32 +635,68 @@ export default function Inicio() {
           </div>
         )}
 
-        {/* MIS MASCOTAS */}
+        {/* ── MASCOTAS ── */}
         {view === 'mascotas' && (
           <div style={{ padding: '48px 40px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
               <div>
-                <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Mis mascotas</h3>
-                <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Todas tus mascotas registradas</p>
+                <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{rol === 'cliente' ? 'Mis mascotas' : 'Mascotas'}</h3>
+                <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>{rol === 'cliente' ? 'Tus mascotas registradas' : 'Todas las mascotas del sistema'}</p>
               </div>
-              <button onClick={() => switchView('registrar')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-mid) 100%)', color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', fontWeight: 500, padding: '10px 20px', borderRadius: 100, border: 'none', cursor: 'pointer', boxShadow: '0 6px 20px rgba(15,157,126,0.28)' }}>
-                + Agregar
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ position: 'relative' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Buscar mascota por nombre..."
+                    value={mascotaSearch}
+                    onChange={e => setMascotaSearch(e.target.value)}
+                    style={{
+                      padding: '10px 16px 10px 40px', border: '1.5px solid rgba(15,157,126,0.2)',
+                      borderRadius: 100, fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem',
+                      color: 'var(--text)', background: 'white', outline: 'none', width: 260,
+                    }}
+                  />
+                </div>
+                {rol === 'cliente' && (
+                  <button onClick={() => switchView('registrar')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-mid) 100%)', color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', fontWeight: 500, padding: '10px 20px', borderRadius: 100, border: 'none', cursor: 'pointer', boxShadow: '0 6px 20px rgba(15,157,126,0.28)', flexShrink: 0 }}>
+                    + Agregar
+                  </button>
+                )}
+              </div>
             </div>
-            {loadingMascotas ? <LoadingDots /> : mascotas.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '72px 24px', color: 'var(--muted)' }}>
-                <span style={{ fontSize: 60, marginBottom: 18, display: 'block', opacity: 0.5 }}>🐾</span>
-                <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Todavía no tenés mascotas registradas</h4>
-                <p style={{ fontSize: '0.88rem', lineHeight: 1.6, marginBottom: 24 }}>Registrá tu primera mascota para empezar a agendar turnos.</p>
-                <button onClick={() => switchView('registrar')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-mid) 100%)', color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', fontWeight: 500, padding: '10px 20px', borderRadius: 100, border: 'none', cursor: 'pointer' }}>+ Registrar mascota</button>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
-                {mascotas.map((m) => {
-                  const isEditing = editingId === m.id
-                  return (
-                  <div key={m.id} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: isEditing ? '20px 24px 24px' : '28px 24px', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--teal), var(--teal-mid))' }} />
+
+            {(() => {
+              const filtradas = mascotaSearch.trim()
+                ? mascotas.filter(m =>
+                    m.nombre.toLowerCase().includes(mascotaSearch.trim().toLowerCase())
+                  )
+                : mascotas
+
+              return loadingMascotas ? <LoadingDots /> : mascotas.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '72px 24px', color: 'var(--muted)' }}>
+                  <span style={{ fontSize: 60, marginBottom: 18, display: 'block', opacity: 0.5 }}>🐾</span>
+                  <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Todavía no tenés mascotas registradas</h4>
+                  <p style={{ fontSize: '0.88rem', lineHeight: 1.6, marginBottom: 24 }}>Registrá tu primera mascota para empezar a agendar turnos.</p>
+                  {rol === 'cliente' && (
+                    <button onClick={() => switchView('registrar')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-mid) 100%)', color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', fontWeight: 500, padding: '10px 20px', borderRadius: 100, border: 'none', cursor: 'pointer' }}>+ Registrar mascota</button>
+                  )}
+                </div>
+              ) : filtradas.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--muted)', background: 'white', border: '1px solid var(--border)', borderRadius: 20 }}>
+                  <span style={{ fontSize: 40, marginBottom: 12, display: 'block', opacity: 0.4 }}>🔍</span>
+                  <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Sin resultados</h4>
+                  <p style={{ fontSize: '0.85rem' }}>No se encontraron mascotas con "{mascotaSearch.trim()}"</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
+                  {filtradas.map((m) => {
+                    const isEditing = editingId === m.id
+                    return (
+                    <div key={m.id} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: isEditing ? '20px 24px 24px' : '28px 24px', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--teal), var(--teal-mid))' }} />
 
                     {isEditing ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -585,16 +740,22 @@ export default function Inicio() {
                           {m.peso && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Peso:</strong> {m.peso} kg</div>}
                           {m.notas_medicas && <div><strong style={{ color: 'var(--text)', fontWeight: 500 }}>Notas:</strong> {m.notas_medicas}</div>}
                         </div>
-                        <button onClick={() => startEdit(m)} style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--cream)', color: 'var(--teal-dark)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 500, padding: '7px 16px', borderRadius: 100, border: '1px solid rgba(15,157,126,0.2)', cursor: 'pointer' }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                          Editar
+                        {rol !== 'veterinario' && (
+                          <button onClick={() => startEdit(m)} style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--cream)', color: 'var(--teal-dark)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 500, padding: '7px 16px', borderRadius: 100, border: '1px solid rgba(15,157,126,0.2)', cursor: 'pointer' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            Editar
+                          </button>
+                        )}
+                        <button onClick={() => abrirHistorial(m.id, m.nombre)} style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-mid) 100%)', color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 500, padding: '7px 16px', borderRadius: 100, border: 'none', cursor: 'pointer' }}>
+                          🏥 Ver historial
                         </button>
                       </>
                     )}
                   </div>
                 )})}
               </div>
-            )}
+              )
+            })()}
           </div>
         )}
 
@@ -656,68 +817,211 @@ export default function Inicio() {
         {/* CITAS */}
         {view === 'citas' && (
           <div style={{ padding: '48px 40px' }}>
-            <div style={{ marginBottom: 32 }}>
-              <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Mis citas</h3>
-              <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Turnos confirmados de tus mascotas</p>
+            <div style={{ marginBottom: 28 }}>
+              <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{rol === 'cliente' ? 'Mis citas' : 'Citas'}</h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>{rol === 'cliente' ? 'Turnos de tus mascotas' : 'Calendario de todas las citas'}</p>
+            </div>
+
+            {/* ── Filtros ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                  type="text"
+                  placeholder={rol === 'cliente' ? 'Buscar mascota...' : 'Buscar mascota o cliente...'}
+                  value={citasFiltroTexto}
+                  onChange={e => setCitasFiltroTexto(e.target.value)}
+                  style={{
+                    padding: '9px 14px 9px 34px', borderRadius: 100, border: '1.5px solid rgba(15,157,126,0.2)',
+                    fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', color: 'var(--text)',
+                    background: 'white', outline: 'none', width: 240,
+                  }}
+                />
+              </div>
+
+              <select
+                value={citasFiltroEstado}
+                onChange={e => setCitasFiltroEstado(e.target.value)}
+                style={{
+                  padding: '9px 14px', borderRadius: 100, border: '1.5px solid rgba(15,157,126,0.2)',
+                  fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', color: 'var(--text)',
+                  background: 'white', outline: 'none', cursor: 'pointer',
+                }}
+              >
+                <option value="todas">Todos los estados</option>
+                <option value="confirmado">Confirmadas</option>
+                <option value="pendiente">Pendientes</option>
+                <option value="cancelado">Canceladas</option>
+                <option value="completado">Completadas</option>
+              </select>
+
+              <select
+                value={citasFiltroFecha}
+                onChange={e => setCitasFiltroFecha(e.target.value)}
+                style={{
+                  padding: '9px 14px', borderRadius: 100, border: '1.5px solid rgba(15,157,126,0.2)',
+                  fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', color: 'var(--text)',
+                  background: 'white', outline: 'none', cursor: 'pointer',
+                }}
+              >
+                <option value="todas">Cualquier fecha</option>
+                <option value="hoy">Hoy</option>
+                <option value="semana">Esta semana</option>
+                <option value="mes">Este mes</option>
+                <option value="futuras">Futuras</option>
+                <option value="pasadas">Pasadas</option>
+              </select>
+
+              {citas.length > 0 && (
+                <span style={{ fontSize: '0.82rem', color: 'var(--muted)', marginLeft: 'auto' }}>
+                  {(() => {
+                    const filtradas = citas.filter(c => {
+                      const text = citasFiltroTexto.trim().toLowerCase()
+                      if (text && !c.mascota_nombre.toLowerCase().includes(text) && !(c as CitaAdmin).cliente_nombre?.toLowerCase().includes(text)) return false
+                      if (citasFiltroEstado !== 'todas' && c.estado !== citasFiltroEstado) return false
+                      const hoy = new Date().toISOString().slice(0, 10)
+                      if (citasFiltroFecha === 'hoy' && c.fecha !== hoy) return false
+                      if (citasFiltroFecha === 'futuras' && c.fecha < hoy) return false
+                      if (citasFiltroFecha === 'pasadas' && c.fecha >= hoy) return false
+                      if (citasFiltroFecha === 'semana') {
+                        const d = new Date(c.fecha + 'T00:00:00')
+                        const hoyDate = new Date()
+                        const start = new Date(hoyDate); start.setDate(hoyDate.getDate() - hoyDate.getDay() + (hoyDate.getDay() === 0 ? -6 : 1))
+                        const end = new Date(start); end.setDate(start.getDate() + 6)
+                        if (d < start || d > end) return false
+                      }
+                      if (citasFiltroFecha === 'mes') {
+                        const d = new Date(c.fecha + 'T00:00:00')
+                        const hoyDate = new Date()
+                        if (d.getMonth() !== hoyDate.getMonth() || d.getFullYear() !== hoyDate.getFullYear()) return false
+                      }
+                      return true
+                    })
+                    return `${filtradas.length} de ${citas.length}`
+                  })()}
+                </span>
+              )}
             </div>
 
             {loadingCitas ? <LoadingDots /> : citas.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '72px 24px', color: 'var(--muted)' }}>
                 <span style={{ fontSize: 60, marginBottom: 18, display: 'block', opacity: 0.5 }}>📅</span>
-                <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>No tenés citas confirmadas</h4>
-                <p style={{ fontSize: '0.88rem', lineHeight: 1.6 }}>Usá el chat de turnos para agendar una cita con el asistente.</p>
+                <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>No hay citas registradas</h4>
+                <p style={{ fontSize: '0.88rem', lineHeight: 1.6 }}>Las citas aparecerán aquí cuando se agenden.</p>
               </div>
             ) : (
-              <>
-                <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: 'var(--teal-light)', borderBottom: '1px solid var(--border)' }}>
-                        {['Fecha', 'Hora', 'Mascota', 'Estado'].map(h => (
-                          <th key={h} style={{ padding: '14px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--teal-dark)' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {citas.map(c => (
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--teal-light)', borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--teal-dark)' }}>Fecha</th>
+                      <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--teal-dark)' }}>Hora</th>
+                      <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--teal-dark)' }}>Mascota</th>
+                      {rol !== 'cliente' && (
+                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--teal-dark)' }}>Cliente</th>
+                      )}
+                      <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--teal-dark)' }}>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const filtradas = citas.filter(c => {
+                        const text = citasFiltroTexto.trim().toLowerCase()
+                        if (text && !c.mascota_nombre.toLowerCase().includes(text) && !(c as CitaAdmin).cliente_nombre?.toLowerCase().includes(text)) return false
+                        if (citasFiltroEstado !== 'todas' && c.estado !== citasFiltroEstado) return false
+                        const hoy = new Date().toISOString().slice(0, 10)
+                        if (citasFiltroFecha === 'hoy' && c.fecha !== hoy) return false
+                        if (citasFiltroFecha === 'futuras' && c.fecha < hoy) return false
+                        if (citasFiltroFecha === 'pasadas' && c.fecha >= hoy) return false
+                        if (citasFiltroFecha === 'semana') {
+                          const d = new Date(c.fecha + 'T00:00:00')
+                          const hoyDate = new Date()
+                          const start = new Date(hoyDate); start.setDate(hoyDate.getDate() - hoyDate.getDay() + (hoyDate.getDay() === 0 ? -6 : 1))
+                          const end = new Date(start); end.setDate(start.getDate() + 6)
+                          if (d < start || d > end) return false
+                        }
+                        if (citasFiltroFecha === 'mes') {
+                          const d = new Date(c.fecha + 'T00:00:00')
+                          const hoyDate = new Date()
+                          if (d.getMonth() !== hoyDate.getMonth() || d.getFullYear() !== hoyDate.getFullYear()) return false
+                        }
+                        return true
+                      })
+
+                      if (filtradas.length === 0) return (
+                        <tr><td colSpan={rol !== 'cliente' ? 5 : 4} style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: '0.88rem' }}>Sin resultados con los filtros actuales.</td></tr>
+                      )
+
+                      const estadoColor: Record<string, string> = {
+                        confirmado: 'var(--teal)',
+                        pendiente: '#FF8F00',
+                        cancelado: 'var(--error)',
+                        completado: '#78909C',
+                      }
+
+                      return filtradas.map(c => (
                         <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)', fontWeight: 500 }}>{new Date(c.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                          <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)', fontWeight: 500 }}>
+                            {new Date(c.fecha + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          </td>
                           <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)' }}>{c.hora.slice(0, 5)}</td>
-                          <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)', fontWeight: 500 }}>{c.mascota_nombre}</td>
+                          <td style={{ padding: '14px 20px', fontSize: '0.9rem' }}>
+                            <span
+                              onClick={() => { abrirHistorial(c.mascota_id, c.mascota_nombre) }}
+                              style={{ color: 'var(--teal-mid)', fontWeight: 500, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}
+                              title="Ver historial médico"
+                            >
+                              🐾 {c.mascota_nombre}
+                            </span>
+                          </td>
+                          {rol !== 'cliente' && (
+                            <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text)' }}>{(c as CitaAdmin).cliente_nombre}</td>
+                          )}
                           <td style={{ padding: '14px 20px' }}>
-                            <span style={{ background: 'var(--teal-light)', color: 'var(--teal-dark)', fontSize: '0.78rem', fontWeight: 600, padding: '4px 12px', borderRadius: 100, display: 'inline-block' }}>{c.estado}</span>
+                            <span style={{
+                              background: `${estadoColor[c.estado] || '#78909C'}15`,
+                              color: estadoColor[c.estado] || '#78909C',
+                              fontSize: '0.75rem', fontWeight: 600, padding: '4px 12px', borderRadius: 100,
+                              display: 'inline-block', textTransform: 'capitalize',
+                            }}>
+                              {c.estado}
+                            </span>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-                {/* Horarios de atención */}
-                <div style={{ marginTop: 48 }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--teal)', marginBottom: 16 }}>Horarios de atención</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
-                    <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                      <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #FFD54F, #FFB300)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                      </div>
-                      <div>
-                        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Mañana</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--muted)', lineHeight: 1.6 }}>Lunes a Viernes<br/>8:00 – 13:00</div>
-                      </div>
+            {/* Horarios de atención */}
+            {citas.length > 0 && (
+              <div style={{ marginTop: 48 }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--teal)', marginBottom: 16 }}>Horarios de atención</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
+                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #FFD54F, #FFB300)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                     </div>
-                    <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                      <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #7C4DFF, #536DFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                      </div>
-                      <div>
-                        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Tarde</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--muted)', lineHeight: 1.6 }}>Lunes a Viernes<br/>17:00 – 21:00</div>
-                      </div>
+                    <div>
+                      <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Mañana</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--muted)', lineHeight: 1.6 }}>Lunes a Viernes<br/>8:00 – 13:00</div>
+                    </div>
+                  </div>
+                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #7C4DFF, #536DFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    </div>
+                    <div>
+                      <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Tarde</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--muted)', lineHeight: 1.6 }}>Lunes a Viernes<br/>17:00 – 21:00</div>
                     </div>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -728,7 +1032,7 @@ export default function Inicio() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
               <div>
                 <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Calendario de citas</h3>
-                <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Todas las citas confirmadas</p>
+                <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Todas las citas</p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <button onClick={() => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })} style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
@@ -748,13 +1052,13 @@ export default function Inicio() {
               </div>
             </div>
 
-            {loadingAdmin ? <LoadingDots /> : (
+            {loadingCitas ? <LoadingDots /> : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
                 {['Lun', 'Mar', 'Mié', 'Jue', 'Vie'].map((dia, i) => {
                   const date = new Date(weekStart)
                   date.setDate(date.getDate() + i)
                   const dateStr = date.toISOString().slice(0, 10)
-                  const dayCitas = adminCitas.filter(c => c.fecha === dateStr)
+                  const dayCitas = citas.filter(c => c.fecha === dateStr)
                   const isToday = new Date().toISOString().slice(0, 10) === dateStr
 
                   return (
@@ -770,7 +1074,7 @@ export default function Inicio() {
                           dayCitas.map(c => (
                             <div key={c.id} style={{ padding: '8px 10px', marginBottom: 6, background: 'var(--cream)', borderRadius: 10, border: '1px solid var(--border)' }}>
                               <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--teal-dark)', marginBottom: 3 }}>{c.hora.slice(0, 5)}</div>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text)', marginBottom: 1 }}>{c.cliente_nombre}</div>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text)', marginBottom: 1 }}>{(c as CitaAdmin).cliente_nombre}</div>
                               <div style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>🐾 {c.mascota_nombre}</div>
                             </div>
                           ))
@@ -781,6 +1085,296 @@ export default function Inicio() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* HISTORIAL */}
+        {view === 'historial' && (
+          <div style={{ padding: '40px', maxWidth: 960, margin: '0 auto', width: '100%' }}>
+
+            {/* ── Header ── */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <button onClick={() => {
+                  if (historialView !== 'list') { setHistorialView('list'); setHistorialSelected(null); setHMsg(null) }
+                  else switchView('mascotas')
+                }} style={{
+                  width: 38, height: 38, borderRadius: 10, border: '1px solid var(--border)',
+                  background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', color: 'var(--text)', flexShrink: 0,
+                }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <div>
+                  <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Historial médico</h3>
+                  <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>🐾 {historialMascotaNombre}</p>
+                </div>
+              </div>
+              {historialView === 'list' && rol !== 'cliente' && (
+                <button onClick={() => setHistorialView('form')} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-mid) 100%)',
+                  color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', fontWeight: 500,
+                  padding: '10px 22px', borderRadius: 100, border: 'none', cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(15,157,126,0.28)', flexShrink: 0,
+                }}>
+                  + Agregar registro
+                </button>
+              )}
+            </div>
+
+            {/* ── LIST VIEW ── */}
+            {historialView === 'list' && (
+              <>
+                {loadingHistorial ? <LoadingDots /> : historialData.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '80px 24px', color: 'var(--muted)', background: 'white', border: '1px solid var(--border)', borderRadius: 24 }}>
+                    <span style={{ fontSize: 48, marginBottom: 16, display: 'block', opacity: 0.4 }}>📋</span>
+                    <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Sin registros médicos</h4>
+                    <p style={{ fontSize: '0.85rem', lineHeight: 1.6, marginBottom: rol !== 'cliente' ? 24 : 0 }}>{historialMascotaNombre} todavía no tiene historial médico.</p>
+                    {rol !== 'cliente' && (
+                      <button onClick={() => setHistorialView('form')} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 8,
+                        background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-mid) 100%)',
+                        color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', fontWeight: 500,
+                        padding: '11px 24px', borderRadius: 100, border: 'none', cursor: 'pointer',
+                        boxShadow: '0 6px 20px rgba(15,157,126,0.28)',
+                      }}>+ Agregar primer registro</button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative', paddingLeft: 32 }}>
+                    <div style={{ position: 'absolute', left: 22, top: 8, bottom: 8, width: 2, background: 'rgba(15,157,126,0.15)' }} />
+                    {(() => {
+                      const tipoConfig: Record<string, { icon: string; color: string }> = {
+                        consulta: { icon: '💊', color: '#0F9D7E' },
+                        vacuna: { icon: '💉', color: '#7C4DFF' },
+                        cirugia: { icon: '🔪', color: '#E53935' },
+                        tratamiento: { icon: '🏥', color: '#FF8F00' },
+                        otro: { icon: '📋', color: '#78909C' },
+                      }
+                      return historialData.map((r) => {
+                        const cfg = tipoConfig[r.tipo] || tipoConfig.otro
+                        return (
+                          <div key={r.id}
+                            onClick={() => { setHistorialSelected(r); setHistorialView('detail') }}
+                            style={{ display: 'flex', gap: 16, marginBottom: 16, position: 'relative', cursor: 'pointer' }}
+                          >
+                            <div style={{
+                              width: 44, height: 44, borderRadius: '50%',
+                              background: `${cfg.color}15`, border: `2px solid ${cfg.color}30`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              flexShrink: 0, fontSize: 18, zIndex: 1,
+                            }}>
+                              {cfg.icon}
+                            </div>
+                            <div style={{
+                              flex: 1, background: 'white', border: '1px solid var(--border)',
+                              borderRadius: 14, padding: '16px 20px',
+                              transition: 'box-shadow 0.15s',
+                            }}
+                              onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)')}
+                              onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <span style={{
+                                  fontSize: '0.68rem', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase',
+                                  color: cfg.color, background: `${cfg.color}12`, padding: '2px 10px', borderRadius: 100,
+                                }}>
+                                  {r.tipo}
+                                </span>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                                  {new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.93rem', fontWeight: 500, color: 'var(--text)', lineHeight: 1.5, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                                {r.descripcion.length > 100 ? r.descripcion.slice(0, 100) + '...' : r.descripcion}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })
+                    })()}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── DETAIL VIEW ── */}
+            {historialView === 'detail' && historialSelected && (
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 24, padding: '36px 40px', minWidth: 0, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                {(() => {
+                  const tipoConfig: Record<string, { icon: string; color: string }> = {
+                    consulta: { icon: '💊', color: '#0F9D7E' },
+                    vacuna: { icon: '💉', color: '#7C4DFF' },
+                    cirugia: { icon: '🔪', color: '#E53935' },
+                    tratamiento: { icon: '🏥', color: '#FF8F00' },
+                    otro: { icon: '📋', color: '#78909C' },
+                  }
+                  const cfg = tipoConfig[historialSelected.tipo] || tipoConfig.otro
+                  return (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div style={{
+                            width: 52, height: 52, borderRadius: '50%',
+                            background: `${cfg.color}15`, border: `2px solid ${cfg.color}30`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+                          }}>
+                            {cfg.icon}
+                          </div>
+                          <div>
+                            <span style={{
+                              fontSize: '0.68rem', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase',
+                              color: cfg.color, background: `${cfg.color}12`, padding: '3px 12px', borderRadius: 100,
+                              display: 'inline-block', marginBottom: 8,
+                            }}>
+                              {historialSelected.tipo}
+                            </span>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+                              {new Date(historialSelected.fecha + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                            </div>
+                          </div>
+                        </div>
+                        {rol === 'admin' && (
+                          <button onClick={() => eliminarRegistroHistorial(historialSelected.id)} style={{
+                            background: 'none', border: '1px solid rgba(229,62,62,0.2)', borderRadius: 10,
+                            cursor: 'pointer', color: 'var(--error)', padding: '8px 12px', display: 'flex',
+                            alignItems: 'center', gap: 6, fontSize: '0.8rem',
+                          }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ marginBottom: 28 }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Descripción</div>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text)', lineHeight: 1.65, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{historialSelected.descripcion}</div>
+                      </div>
+
+                      {historialSelected.diagnostico && (
+                        <div style={{ marginBottom: 24, background: 'var(--cream)', borderRadius: 14, padding: '20px 22px' }}>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Diagnóstico</div>
+                          <div style={{ fontSize: '0.93rem', color: 'var(--text)', lineHeight: 1.65, whiteSpace: 'pre-line', overflowWrap: 'break-word', wordBreak: 'break-word' }}>{historialSelected.diagnostico}</div>
+                        </div>
+                      )}
+
+                      {historialSelected.tratamiento && (
+                        <div style={{ marginBottom: 24, background: 'rgba(15,157,126,0.04)', borderRadius: 14, padding: '20px 22px', border: '1px solid rgba(15,157,126,0.1)', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--teal-dark)', marginBottom: 8 }}>Tratamiento</div>
+                          <div style={{ fontSize: '0.93rem', color: 'var(--text)', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{historialSelected.tratamiento}</div>
+                        </div>
+                      )}
+
+                      {historialSelected.notas && (
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Notas</div>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--muted)', fontStyle: 'italic', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{historialSelected.notas}</div>
+                        </div>
+                      )}
+
+                      {!historialSelected.diagnostico && !historialSelected.tratamiento && !historialSelected.notas && (
+                        <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--muted)', fontSize: '0.85rem', background: 'var(--cream)', borderRadius: 14 }}>
+                          Sin información adicional para este registro.
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+            )}
+
+            {/* ── FORM VIEW ── */}
+            {historialView === 'form' && (
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 24, padding: '36px 40px', maxWidth: 560, minWidth: 0 }}>
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)', marginBottom: 24 }}>
+                  Agregar registro médico
+                </div>
+                <form onSubmit={guardarHistorial} style={{ display: 'flex', flexDirection: 'column', gap: 18 }} noValidate>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 500 }}>Tipo</label>
+                      <select style={inputStyle} value={hTipo} onChange={e => setHTipo(e.target.value)}>
+                        <option value="consulta">💊 Consulta</option>
+                        <option value="vacuna">💉 Vacuna</option>
+                        <option value="cirugia">🔪 Cirugía</option>
+                        <option value="tratamiento">🏥 Tratamiento</option>
+                        <option value="otro">📋 Otro</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 500 }}>Fecha</label>
+                      <input style={inputStyle} type="date" value={hFecha} onChange={e => setHFecha(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 500 }}>Descripción *</label>
+                    <textarea
+                      style={{ ...inputStyle, resize: 'vertical', minHeight: 80, fontFamily: 'DM Sans, sans-serif', overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                      placeholder="Motivo de la consulta, síntomas, vacuna aplicada..."
+                      value={hDescripcion} onChange={e => setHDescripcion(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 500 }}>Diagnóstico</label>
+                    <textarea
+                      style={{ ...inputStyle, resize: 'vertical', minHeight: 65, fontFamily: 'DM Sans, sans-serif', overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                      placeholder="Opcional"
+                      value={hDiagnostico} onChange={e => setHDiagnostico(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 500 }}>Tratamiento</label>
+                    <textarea
+                      style={{ ...inputStyle, resize: 'vertical', minHeight: 65, fontFamily: 'DM Sans, sans-serif', overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                      placeholder="Medicación, dosis, indicaciones... (opcional)"
+                      value={hTratamiento} onChange={e => setHTratamiento(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 500 }}>Notas</label>
+                    <input style={inputStyle} type="text" placeholder="Observaciones adicionales..." value={hNotas} onChange={e => setHNotas(e.target.value)} />
+                  </div>
+
+                  {hMsg && (
+                    <div style={{ borderRadius: 12, padding: '12px 16px', fontSize: '0.85rem', background: hMsg.type === 'ok' ? 'var(--teal-light)' : '#fff5f5', border: `1px solid ${hMsg.type === 'ok' ? 'rgba(15,157,126,0.2)' : 'rgba(229,62,62,0.25)'}`, color: hMsg.type === 'ok' ? 'var(--teal-dark)' : 'var(--error)' }}>
+                      {hMsg.text}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                    <button type="submit" disabled={hSaving} style={{
+                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                      background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-mid) 100%)',
+                      color: 'white', fontFamily: 'DM Sans, sans-serif', fontSize: '0.9rem', fontWeight: 500,
+                      padding: '14px', borderRadius: 100, border: 'none',
+                      cursor: hSaving ? 'not-allowed' : 'pointer', opacity: hSaving ? 0.6 : 1,
+                      boxShadow: '0 6px 20px rgba(15,157,126,0.28)',
+                    }}>
+                      {hSaving ? 'Guardando...' : 'Guardar registro'}
+                    </button>
+                    <button type="button" onClick={() => { setHistorialView('list'); setHMsg(null) }} style={{
+                      background: 'white', color: 'var(--muted)', fontFamily: 'DM Sans, sans-serif',
+                      fontSize: '0.9rem', fontWeight: 500, padding: '14px 24px', borderRadius: 100,
+                      border: '1px solid var(--border)', cursor: 'pointer',
+                    }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
           </div>
         )}
 

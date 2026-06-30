@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
+const API = import.meta.env.VITE_API_URL || 'https://proyec1-server.bxyea0.easypanel.host/api'
+
 export default function Register() {
   const [form, setForm] = useState({ nombre: '', apellido: '', dni: '', telefono: '', username: '', password: '' })
   const [showPw, setShowPw] = useState(false)
@@ -31,7 +33,7 @@ export default function Register() {
     if (!validate()) return
     setLoading(true)
     try {
-      const res = await fetch('https://proyec1-server.bxyea0.easypanel.host/api/registro', {
+      const res = await fetch(`${API}/registro`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, nombre: form.nombre.trim(), apellido: form.apellido.trim(), dni: form.dni.trim(), telefono: form.telefono.trim(), username: form.username.trim() }),

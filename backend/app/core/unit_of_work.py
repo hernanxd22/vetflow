@@ -1,12 +1,14 @@
 from sqlalchemy.orm import Session
 from app.modules.mascotas.repository import MascotaRepository
 from app.modules.auth.repository import ClienteRepository
+from app.modules.historial.repository import HistorialRepository
 
 class UnitOfWork:
     def __init__(self, db: Session):
         self.db = db
         self.mascotas = MascotaRepository(db)
         self.clientes = ClienteRepository(db)
+        self.historial = HistorialRepository(db)
 
     def commit(self):
         self.db.commit()

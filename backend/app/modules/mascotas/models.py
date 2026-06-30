@@ -17,3 +17,4 @@ class Mascota(Base):
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
 
     cliente = relationship("Cliente", back_populates="mascotas")
+    historial = relationship("HistorialMedico", back_populates="mascota", cascade="all, delete-orphan")

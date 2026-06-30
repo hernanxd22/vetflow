@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 
+const API = import.meta.env.VITE_API_URL || 'https://proyec1-server.bxyea0.easypanel.host/api'
+
 export default function Login() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
@@ -24,7 +26,7 @@ export default function Login() {
     if (!validate()) return
     setLoading(true)
     try {
-      const res = await fetch('https://proyec1-server.bxyea0.easypanel.host/api/login', {
+      const res = await fetch(`${API}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
