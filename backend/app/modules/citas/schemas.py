@@ -14,3 +14,12 @@ class CitaClienteResponse(BaseModel):
 class CitaAdminResponse(CitaClienteResponse):
     cliente_id: int
     cliente_nombre: str
+
+
+class CitaVetResponse(BaseModel):
+    id: int
+    fecha: str
+    hora: str
+    estado: str
+    mascota_nombre: str
+    cliente_nombre: str

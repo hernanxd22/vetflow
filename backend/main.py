@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
                 created_at TIMESTAMPTZ DEFAULT NOW()
             )
         """))
+        conn.execute(text("ALTER TABLE citas ADD COLUMN IF NOT EXISTS veterinario_id INTEGER REFERENCES clientes(id)"))
         conn.commit()
     yield
 

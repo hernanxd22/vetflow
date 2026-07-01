@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List
-from app.modules.citas.schemas import CitaClienteResponse, CitaAdminResponse
+from app.modules.citas.schemas import CitaClienteResponse, CitaAdminResponse, CitaVetResponse
 
 
 def get_citas_cliente(cliente_id: int, db: Session) -> List[CitaClienteResponse]:
@@ -41,6 +41,29 @@ def get_citas_admin(db: Session) -> List[CitaAdminResponse]:
             id=row[0], fecha=row[1], hora=row[2],
             estado=row[3], mascota_id=row[4], mascota_nombre=row[5],
             cliente_id=row[6], cliente_nombre=row[7]
+        )
+        for row in rows
+    ]
+
+
+def get_citas_veterinario(veterinario_id: int, db: Session) -> List[CitaVetResponse]:
+    sql = text("""
+        SELECT c.id, c.fecha::text, c.hora::text, c.estado,
+               m.nombre AS mascota_nombre,
+               cl.nombre || ' ' || cl.apellido AS cliente_nombre
+        FROM citas c
+        JOIN mascotas m ON m.id = c.mascota_id
+        JOIN clientes cl ON cl.id = c.cliente_id
+        WHERE c.veterinario_id = :veterinario_id
+          AND c.estado = 'confirmado'
+        ORDER BY c.fecha ASC, c.hora ASC
+    """)
+    result = db.execute(sql, {"veterinario_id": veterinario_id})
+    rows = result.fetchall()
+    return [
+        CitaVetResponse(
+            id=row[0], fecha=row[1], hora=row[2],
+            estado=row[3], mascota_nombre=row[4], cliente_nombre=row[5]
         )
         for row in rows
     ]
