@@ -1,0 +1,5310 @@
+{
+  "name": "actu",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3216,
+        2224
+      ],
+      "id": "c80d7faf-f126-4aaa-be53-ae531b3c2cd4",
+      "name": "Webhook",
+      "webhookId": "6ecf12d4-d772-4dd9-a4e2-d4292aa17ff0"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.mensaje }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        176,
+        4336
+      ],
+      "id": "843c63de-d219-4aa3-92fa-4c01ec3acc21",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.mensaje }}",
+        "options": {
+          "systemMessage": "=Tu fecha y hora actual de referencia es:\n{{ $now.setZone('America/Argentina/Buenos_Aires').format('EEEE d \"de\" MMMM \"de\" yyyy, HH:mm') }}\nZona horaria: Mendoza/Buenos Aires, Argentina.\n\nSos un asistente que SOLO clasifica intenciones.\nRespondé únicamente en JSON válido, sin texto extra.\n\nPosibles acciones:\n- agendar\n- reprogramar\n- cancelar\n- consultar\n- saludo (cuando el usuario saluda explícitamente: \"hola\", \"buenas\", \"buen día\")\n- desconocido (cualquier mensaje que no sea una acción clara ni un saludo explícito)\n- despedida (cuando el usuario agradece o se despide: \"gracias\", \"ok gracias\", \"chau\", \"hasta luego\")\n\nTambién extraé:\n- fecha (si existe)\n- hora (si existe)\n- titulo (si existe, el nombre o descripción de la cita)\n- event_id (si el usuario menciona un número o nombre de cita para reprogramar o cancelar, buscalo en el historial de conversación)\n\nFormato de respuesta:\n{\n  \"accion\": \"agendar\",\n  \"fecha\": \"YYYY-MM-DD\",\n  \"hora\": \"HH:MM\",\n  \"titulo\": null,\n  \"event_id\": null\n}\n\nReglas:\n- Si no hay fecha, poner null\n- Si no hay hora, poner null\n- Si no hay titulo, poner null\n- Si no hay event_id, poner null\n- No inventar datos\n- \"ser\", \"ok\", \"si\", \"no\" y mensajes cortos sin sentido = desconocido\n- \"gracias\", \"ok gracias\", \"chau\", \"hasta luego\", \"perfecto\", \"genial\" = despedida\n- Un número solo (\"1\", \"2\", \"3\") = SIEMPRE desconocido, nunca una acción nueva\n- Una fecha o una hora sola sin contexto = desconocido\n- Si el mensaje es una respuesta corta a una pregunta anterior = desconocido"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        64,
+        4080
+      ],
+      "id": "0642effa-30fd-4273-8587-8c9f79e2286a",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        4336
+      ],
+      "id": "089bb3c2-537f-4a10-9720-b4dc34c59df5",
+      "name": "OpenRouter Chat Model1",
+      "notesInFlow": false,
+      "credentials": {
+        "openRouterApi": {
+          "id": "taZSxm8EnSZzAMas",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json.output;\n// limpiar los ```json\nraw = raw.replace(/```json/g, \"\").replace(/```/g, \"\").trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  parsed = {\n    accion: null,\n    fecha: null,\n    hora: null,\n    titulo: null,\n    event_id: \"el_id_del_evento\",\n    error: \"No se pudo parsear\"\n  };\n}\n\nreturn [{\n  json: parsed\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        4080
+      ],
+      "id": "a31d8268-b466-4647-8d2c-c4fac57cd7a7",
+      "name": "de texto a json"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9b986a16-9364-4444-aa68-441bc4c999a5",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "agendar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b421e698-a5cb-4797-8fa0-047067f9ca7b",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "consultar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5dc27afd-4114-4608-8ccd-7160c1c3ffd5",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "reprogramar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "27aa8d3e-59ae-437b-a6bc-89303a9c1ee5",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "cancelar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "bdd178b1-1229-47ca-88fb-178e2474d512",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "saludo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7e8dcb50-fd26-43ef-9758-64106081f3be",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "despedida",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        864,
+        4016
+      ],
+      "id": "f666c367-fcaa-41f4-8d54-490cf5bc56b2",
+      "name": "determina estado"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "agendando",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7a8e39e4-296b-4893-9089-0c5ad0e81f1a"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7a9a4819-b999-426e-97da-14eee7bf9e1e",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "espaveterinario",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "3b957caa-ad63-4237-a0f9-d7114a8ca8ae",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "espfecha",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e58a070f-3edc-439a-8dd4-5bff806cc8c1",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "esphora",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "bf66c8c6-aabe-4c14-a8ab-6e8f2bdd5b36",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "cancelando",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7cfbc5ff-c7c7-408d-beba-6499b85aebc0",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "cancefeho",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "950b05f7-6ad2-4002-9eab-b8886bd56af8",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "reprogramando",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "74dc3707-8fd9-451c-8750-d810ca0bc0e7",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "reprofeho",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5846fae9-5a05-44ee-a2eb-79b048e93e98",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "espreprogramar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a1d32a19-c8b0-4b69-a6ba-e4483f268ce8",
+                    "leftValue": "={{ $json.estado }}",
+                    "rightValue": "reprehora",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8e75efc2-a7e6-40ce-b358-c2a337feccec",
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -1936,
+        2240
+      ],
+      "id": "dbf8cbff-8305-49f0-bf39-d5ef05bf8dbc",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"respuesta\": $json.respuesta} }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2208,
+        3920
+      ],
+      "id": "2085b5ff-ad0d-4d4a-8e79-3d860ec9896f",
+      "name": "Respond to Webhook3"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"respuesta\": $('Code in JavaScript7').item.json.mensaje} }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2736,
+        4192
+      ],
+      "id": "5a5418e6-6853-4e0e-bab0-1f75fd6b9d1b",
+      "name": "Respond to Webhook4"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"respuesta\": $('Code in JavaScript5').item.json.mensaje} }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2704,
+        3680
+      ],
+      "id": "968cce9e-b281-47b9-a3cd-2b563ff2cdd1",
+      "name": "Respond to Webhook5"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "mascotas",
+          "mode": "list",
+          "cachedResultName": "mascotas"
+        },
+        "limit": 20,
+        "where": {
+          "values": [
+            {
+              "column": "cliente_id",
+              "value": "={{ $('Webhook').item.json.body.cliente_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1952,
+        3680
+      ],
+      "id": "58a45033-90a4-43c4-80c9-752e3a175f1d",
+      "name": "Select rows from a table",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const mascotas = $input.all();\nconst clienteId = $('Webhook').item.json.body.cliente_id;\n\n// Armar el mensaje\nconst lista = mascotas.map((m, i) => `${i+1}- ${m.json.nombre} (${m.json.especie})`).join('\\n');\nconst mensaje = `¿Para qué mascota querés agendar?\\n${lista}`;\n\n// Guardar el mapeo como JSON string: {\"1\": 10, \"2\": 23}\nconst mapeo = {};\nmascotas.forEach((m, i) => { mapeo[i+1] = m.json.id; });\n\nreturn [{ json: { \n  mensaje, \n  mapeo: JSON.stringify(mapeo),\n  cliente_id: clienteId\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2208,
+        3680
+      ],
+      "id": "765a38cd-900f-423d-a1d3-9e481a04d371",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "cliente_id",
+              "value": "={{ $json.body.cliente_id }}"
+            }
+          ]
+        },
+        "sort": {
+          "values": [
+            {
+              "column": "id",
+              "direction": "DESC"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2496,
+        2240
+      ],
+      "id": "6fb2363a-6787-43fd-b5fd-f83b3b105617",
+      "name": "Select rows from a table1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"respuesta\": \"{{ $('Code in JavaScript11').first().json.mensaje.replace(/\\n/g, '\\\\n') }}\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1952,
+        -1616
+      ],
+      "id": "c30f6f61-015f-4ac6-84b9-eb4c5d473f9b",
+      "name": "Respond to Webhook8"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "eb87e37c-ccdb-4d92-abe9-bcac9d822666",
+              "leftValue": "={{ $json.body.mensaje }}",
+              "rightValue": "salir",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2928,
+        2224
+      ],
+      "id": "7e59e59a-6c6a-4ade-83a6-84a441a73642",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "cliente_id": "={{ $('Webhook').item.json.body.cliente_id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2768,
+        1872
+      ],
+      "id": "3dadd117-1cd9-4695-90d4-2a04ffe65ecb",
+      "name": "Insert rows in a table3",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"respuesta\": \"Salio..\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -2528,
+        1872
+      ],
+      "id": "51c4ad6f-6aa8-48bf-bbe3-946624f17331",
+      "name": "Respond to Webhook9"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "estado": "agendando",
+            "notas": "={{ $json.mapeo }}",
+            "id": "={{ $('agendar').first().json.id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2464,
+        3680
+      ],
+      "id": "b2929f7a-3af3-4363-abc8-cd7c7484b6bb",
+      "name": "Update rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.cita_id }}",
+            "mascota_id": "={{ $json.mascota_id }}",
+            "estado": "espaveterinario"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        768,
+        -1616
+      ],
+      "id": "9fa3ff79-3308-494e-94e1-3928a57eda5c",
+      "name": "Update rows in a table1",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const vets = $input.all();\n\nconst lista = vets.map((v, i) => \n  `${i+1}- Dr/a. ${v.json.nombre} ${v.json.apellido}`\n).join('\\n');\n\nconst mensaje = `¿A qué veterinario le asignamos esta cita?\\n${lista}`;\n\nconst mapeo = {};\nvets.forEach((v, i) => { mapeo[i+1] = v.json.id; });\n\nreturn [{ json: {\n  mensaje,\n  mapeo: JSON.stringify(mapeo)\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        -1616
+      ],
+      "id": "ee9ae50a-d456-42f8-a3b3-22950bd0096d",
+      "name": "Code in JavaScript11"
+    },
+    {
+      "parameters": {
+        "jsCode": "const citas = $input.all();\n\nif (citas.length === 0 || !citas[0].json.id) {\n  return [{ json: { respuesta: \"No tenés citas agendadas.\" } }];\n}\n\nconst lista = citas.map(c => {\n  const fecha = c.json.fecha.split('T')[0];\n  const hora = c.json.hora.substring(0, 5);\n  return `• ${c.json.mascota}: ${fecha} a las ${hora}hs`;\n}).join('\\n');\n\nreturn [{ json: { respuesta: `Tus citas confirmadas:\\n${lista}` } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1952,
+        3920
+      ],
+      "id": "3208c23b-38a6-4c8d-a5dc-c68c6aa17022",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "cliente_id": "={{ $('Webhook').item.json.body.cliente_id }}",
+            "estado": "reprogramando"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1696,
+        4192
+      ],
+      "id": "7ce4a7c7-27f1-42e3-91fc-d802dd6ca103",
+      "name": "reprogramando",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.id, c.fecha, c.hora, c.estado, COALESCE(m.nombre, 'Sin mascota') as mascota\nFROM citas c\nLEFT JOIN mascotas m ON c.mascota_id = m.id\nWHERE c.cliente_id = {{ $('Webhook').item.json.body.cliente_id }}\nAND c.estado = 'confirmado'\nAND c.fecha IS NOT NULL\nAND (c.fecha::date > CURRENT_DATE OR (c.fecha::date = CURRENT_DATE AND c.hora >= CURRENT_TIME AT TIME ZONE 'America/Argentina/Buenos_Aires'))\nORDER BY c.fecha ASC, c.hora ASC",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1696,
+        3920
+      ],
+      "id": "4df8a69d-3a69-4174-857c-511c9f27592e",
+      "name": "consulta",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "cliente_id": "={{ $('Webhook').item.json.body.cliente_id }}",
+            "estado": "agendando"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1696,
+        3680
+      ],
+      "id": "1978079d-fad7-46b6-9c73-bc379fa66702",
+      "name": "agendar",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "cliente_id": "={{ $('Webhook').item.json.body.cliente_id }}",
+            "estado": "cancelando"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1696,
+        4496
+      ],
+      "id": "290a03f6-c8a0-4d6b-b61f-1d2918d8c5f5",
+      "name": "cancelar",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"respuesta\": \"¡Hola! ¿En qué puedo ayudarte hoy?\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1696,
+        4768
+      ],
+      "id": "29c487cd-307a-4b40-abb9-0275a31f456c",
+      "name": "saludo"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"respuesta\": \"¡Que tengas un buen día!\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1728,
+        5248
+      ],
+      "id": "f2189dae-1f80-42b8-8143-c5408c44df1c",
+      "name": "salida"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "mascotas",
+          "mode": "list",
+          "cachedResultName": "mascotas"
+        },
+        "limit": 20,
+        "where": {
+          "values": [
+            {
+              "column": "cliente_id",
+              "value": "={{ $('Webhook').item.json.body.cliente_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1952,
+        4192
+      ],
+      "id": "d64fbbdb-c03f-47f2-9441-0a3d4e7fae03",
+      "name": "Select rows from a table3",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const mascotas = $input.all();\nconst clienteId = $('Webhook').item.json.body.cliente_id;\n\n// Armar el mensaje\nconst lista = mascotas.map((m, i) => `${i+1}- ${m.json.nombre} (${m.json.especie})`).join('\\n');\nconst mensaje = `¿Para qué mascota querés reprogramar?\\n${lista}`;\n\n// Guardar el mapeo como JSON string: {\"1\": 10, \"2\": 23}\nconst mapeo = {};\nmascotas.forEach((m, i) => { mapeo[i+1] = m.json.id; });\n\nreturn [{ json: { \n  mensaje, \n  mapeo: JSON.stringify(mapeo),\n  cliente_id: clienteId\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        4192
+      ],
+      "id": "658394f1-f817-447d-92d9-e95234b5030c",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "estado": "reprogramando",
+            "notas": "={{ $json.mapeo }}",
+            "id": "={{ $('reprogramando').first().json.id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2464,
+        4192
+      ],
+      "id": "b10e9bc8-fd90-49fd-b3ad-5a9de06cdde0",
+      "name": "Update rows in a table3",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"respuesta\": $('Code in JavaScript8').item.json.mensaje} }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2736,
+        4496
+      ],
+      "id": "f8e19661-9948-429c-a00b-11928a3dda40",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "mascotas",
+          "mode": "list",
+          "cachedResultName": "mascotas"
+        },
+        "limit": 20,
+        "where": {
+          "values": [
+            {
+              "column": "cliente_id",
+              "value": "={{ $('Webhook').item.json.body.cliente_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1968,
+        4496
+      ],
+      "id": "0e67dadf-cc0f-4b8e-b3ed-a8f4084bf85d",
+      "name": "Select rows from a table4",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const mascotas = $input.all();\nconst clienteId = $('Webhook').item.json.body.cliente_id;\n\n// Armar el mensaje\nconst lista = mascotas.map((m, i) => `${i+1}- ${m.json.nombre} (${m.json.especie})`).join('\\n');\nconst mensaje = `¿Para qué mascota querés cancelar?\\n${lista}`;\n\n// Guardar el mapeo como JSON string: {\"1\": 10, \"2\": 23}\nconst mapeo = {};\nmascotas.forEach((m, i) => { mapeo[i+1] = m.json.id; });\n\nreturn [{ json: { \n  mensaje, \n  mapeo: JSON.stringify(mapeo),\n  cliente_id: clienteId\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        4496
+      ],
+      "id": "f8cd71d0-25ee-447d-99da-5d0f0793ea7a",
+      "name": "Code in JavaScript8"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "estado": "cancelando",
+            "notas": "={{ $json.mapeo }}",
+            "id": "={{ $('cancelar').first().json.id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2480,
+        4496
+      ],
+      "id": "cb29e3f5-bf21-44c7-8c22-895900964b29",
+      "name": "Update rows in a table4",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"respuesta\": $('Code in JavaScript12').first().json.respuesta} }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1920,
+        1600
+      ],
+      "id": "35d5e57b-1754-499b-9b2b-d0cad281b1f0",
+      "name": "Respond to Webhook13"
+    },
+    {
+      "parameters": {
+        "jsCode": "const citas = $input.all();\nconst ahora = new Date();\n\nconst citasFuturas = citas.filter(c => {\n  if (!c.json.fecha) return false;\n  const fechaHora = new Date(c.json.fecha.split('T')[0] + 'T' + (c.json.hora || '23:59:00') + '-03:00');\n  return fechaHora > ahora;\n});\n\nif (citasFuturas.length === 0) {\n  return [{ json: { respuesta: \"No tenés citas pendientes para esa mascota.\" } }];\n}\n\nconst mapeo = {};\nconst lista = citasFuturas.map((c, i) => {\n  mapeo[i + 1] = { cita_id: c.json.id, veterinario_id: c.json.veterinario_id };\n  const fecha = new Date(c.json.fecha).toLocaleDateString('es-AR', { \n    weekday: 'long', day: 'numeric', month: 'long' \n  });\n  const hora = c.json.hora ? c.json.hora.slice(0, 5) : 'sin hora';\n  const vet = c.json.vet_nombre ? ` - Dr/a. ${c.json.vet_nombre}` : '';\n  return `${i + 1}- ${fecha}, ${hora}${vet}`;\n}).join('\\n');\n\nreturn [{ json: { \n  respuesta: `¿Cuál cita querés reprogramar?\\n${lista}`, \n  citas_mapeo: JSON.stringify(mapeo)\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        1600
+      ],
+      "id": "c4c288b5-59ad-43aa-8558-0ed56dfbe123",
+      "name": "Code in JavaScript12"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"respuesta\": \"Cita cancelada correctamente\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1904,
+        960
+      ],
+      "id": "1807b94f-363e-4bb6-8971-cebda4d600f0",
+      "name": "Respond to Webhook14"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Switch').first().json.id }}",
+            "estado": "=reprofeho",
+            "notas": "= {{ $json.citas_mapeo }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1632,
+        1600
+      ],
+      "id": "fd91e9c8-6341-45f0-a08c-3e38aba5dd0d",
+      "name": "Update rows in a table5",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"respuesta\": $json.respuesta} }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1536,
+        2096
+      ],
+      "id": "3c3452d6-8f11-4e26-93ce-8b38ad290097",
+      "name": "Respond to Webhook18"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { respuesta: \"Perfecto! ¿Para qué fecha querés reprogramar el turno? (formato: DD/MM/AAAA)\" }}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        2096
+      ],
+      "id": "25b773cb-2c4e-4ac8-b0c6-9710875202af",
+      "name": "Code in JavaScript15"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"respuesta\": $('Code in JavaScript17').first().json.respuesta} }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2000,
+        576
+      ],
+      "id": "55106ec5-e225-4189-9bbf-bf76e5f57fc5",
+      "name": "Respond to Webhook19"
+    },
+    {
+      "parameters": {
+        "jsCode": "const citas = $input.all();\nconst ahora = new Date();\n\nconst citasFuturas = citas.filter(c => {\n  if (!c.json.fecha) return false;\n  const fechaHora = new Date(c.json.fecha.split('T')[0] + 'T' + (c.json.hora || '23:59:00') + '-03:00');\n  return fechaHora > ahora;\n});\n\nif (citasFuturas.length === 0) {\n  return [{ json: { respuesta: \"No tenés citas pendientes para esa mascota.\" } }];\n}\n\nconst mapeo = {};\nconst lista = citasFuturas.map((c, i) => {\n  mapeo[i + 1] = c.json.id;\n  const fecha = new Date(c.json.fecha).toLocaleDateString('es-AR', { \n    weekday: 'long', \n    day: 'numeric', \n    month: 'long' \n  });\n  const hora = c.json.hora ? c.json.hora.slice(0, 5) : 'sin hora';\n  const vet = c.json.vet_nombre ? ` - Dr/a. ${c.json.vet_nombre}` : '';\n  return `${i + 1}- ${fecha}, ${hora}${vet}`;\n}).join('\\n');\n\nreturn [{ json: { \n  respuesta: `¿Cuál cita querés cancelar?\\n${lista}`, \n  citas_mapeo: JSON.stringify(mapeo) \n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        576
+      ],
+      "id": "9ec42239-42b7-403b-aca1-7aa7168ff9f5",
+      "name": "Code in JavaScript17"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Switch').first().json.id }}",
+            "estado": "cancefeho",
+            "notas": "= {{ $json.citas_mapeo }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1712,
+        576
+      ],
+      "id": "c3f39e06-a48d-4917-b347-f3f63d48e793",
+      "name": "Update rows in a table9",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('cancefeho').item.json.cita_id }}",
+            "estado": "cancelado"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        960
+      ],
+      "id": "f3d8cb61-59b2-4c79-a990-2dc745d2e79c",
+      "name": "Update rows in a table8",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT calendar_event_id FROM citas WHERE id = {{ $('cancefeho').item.json.cita_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1136,
+        960
+      ],
+      "id": "ea459b8f-dd4a-4411-82b0-a9704ecf794b",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "eventId": "={{ $json.calendar_event_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1360,
+        960
+      ],
+      "id": "38633678-ae4d-4399-b06e-5278c4eb7799",
+      "name": "Delete an event",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM citas WHERE id = {{ $('Select rows from a table1').item.json.id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1616,
+        960
+      ],
+      "id": "452d1847-0a9f-4452-853b-4ef33bcb5a2e",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cita = $('Select rows from a table1').item.json;\nconst mapeo = JSON.parse(cita.notas);\nconst opcion = $('Webhook').item.json.body.mensaje.trim(); // \"1\"\nconst mascotaId = mapeo[opcion];\n\nif (!mascotaId) {\n  return [{ json: { error: true, respuesta: \"Opción inválida, elegí un número de la lista.\" }}];\n}\n\nreturn [{ json: { mascota_id: mascotaId, cita_id: cita.id, respuesta: null }}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        -1696
+      ],
+      "id": "a1130ca8-ea47-4e1a-8c4c-0eb14c9f7d46",
+      "name": "agendando"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cita = $('Select rows from a table1').item.json;\nconst mapeo = JSON.parse(cita.notas);\nconst opcion = $('Webhook').item.json.body.mensaje.trim();\nconst mascotaId = mapeo[opcion];\n\nif (!mascotaId) {\n  return [{ json: { error: true, respuesta: \"Opción inválida, elegí un número de la lista.\" } }];\n}\n\nreturn [{ json: { mascota_id: mascotaId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        1600
+      ],
+      "id": "3fcfaa9d-ec2c-4274-a996-ba15f046173b",
+      "name": "reprogramando1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cita = $('Switch').first().json;\nconst mapeo = JSON.parse(cita.notas);\nconst opcion = $('Webhook').first().json.body.mensaje.trim();\nconst seleccion = mapeo[opcion]; // ahora es { cita_id, veterinario_id }\n\nif (!seleccion) {\n  return [{ json: { respuesta: \"Opción inválida, elegí un número de la lista.\" }}];\n}\n\nreturn [{ json: { \n  cita_id: seleccion.cita_id,\n  veterinario_id: seleccion.veterinario_id\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        2096
+      ],
+      "id": "6764716a-112f-40ae-8847-b828d6602d72",
+      "name": "reprofeho"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cita = $('Select rows from a table1').item.json;\nconst mapeo = JSON.parse(cita.notas);\nconst opcion = $('Webhook').item.json.body.mensaje.trim();\nconst mascotaId = mapeo[opcion];\n\nif (!mascotaId) {\n  return [{ json: { error: true, respuesta: \"Opción inválida, elegí un número de la lista.\" } }];\n}\n\nreturn [{ json: { mascota_id: mascotaId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        576
+      ],
+      "id": "3142514a-40f7-40b9-a235-0c7a11acd05c",
+      "name": "cancelando"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cita = $('Select rows from a table1').item.json;\nconst mapeo = JSON.parse(cita.notas);\nconst opcion = $('Webhook').item.json.body.mensaje.trim();\nconst citaId = mapeo[opcion];\n\nif (!citaId) {\n  return [{ json: { error: true, respuesta: \"Opción inválida, elegí un número de la lista.\" }}];\n}\n\nreturn [{ json: { cita_id: citaId, respuesta: null }}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        960
+      ],
+      "id": "d0b886d7-c19c-4b3d-b00e-7cc13f23f46b",
+      "name": "cancefeho"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, nombre, apellido FROM clientes \nWHERE rol = 'veterinario' AND estado = 'activo'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1040,
+        -1616
+      ],
+      "id": "a621f231-55c1-4ccc-afb2-e5a2d653cd54",
+      "name": "Execute a SQL query4",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('agendando').first().json.cita_id }}",
+            "notas": "={{ $('Code in JavaScript11').item.json.mapeo }}",
+            "estado": "espaveterinario"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1632,
+        -1616
+      ],
+      "id": "00f4d859-bd09-4405-9c4b-641b230ecd49",
+      "name": "Update rows in a table2",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, notas FROM citas \nWHERE cliente_id = {{ $('Webhook').first().json.body.cliente_id }}\nAND estado = 'espaveterinario'\nORDER BY created_at DESC\nLIMIT 1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        368,
+        -1184
+      ],
+      "id": "71df6ec4-fa48-4823-ab32-334d356c0d25",
+      "name": "Execute a SQL query5",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cita = $('Execute a SQL query5').first().json;\nconst mapeo = JSON.parse(cita.notas);\nconst opcion = $('Webhook').first().json.body.mensaje.trim();\nconst veterinarioId = mapeo[opcion];\n\nif (!veterinarioId) {\n  return [{ json: { error: true, respuesta: \"Opción inválida, elegí un número de la lista.\" }}];\n}\n\nreturn [{ json: { \n  veterinario_id: veterinarioId, \n  cita_id: cita.id \n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -1184
+      ],
+      "id": "6138680d-31c8-451b-a866-8a2a94dbfc1c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.cita_id }}",
+            "veterinario_id": "={{ $json.veterinario_id }}",
+            "estado": "espfecha"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "veterinario_id",
+              "displayName": "veterinario_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1152,
+        -1104
+      ],
+      "id": "55bef233-a805-4ceb-a8af-b79f585ea246",
+      "name": "Update rows in a table11",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"respuesta\": \"Perfecto! ¿Para qué fecha querés el turno? (formato: DD/MM/AAAA)\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1472,
+        -1104
+      ],
+      "id": "523a1095-d1f2-4d80-8ebf-a8429f00f179",
+      "name": "Respond to Webhook20"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, veterinario_id FROM citas\nWHERE cliente_id = {{ $('Webhook').first().json.body.cliente_id }}\nAND estado = 'espfecha'\nORDER BY created_at DESC\nLIMIT 1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        -720
+      ],
+      "id": "36c1d4f4-3d49-43c2-840a-f349b15c25e0",
+      "name": "Execute a SQL query6",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT hora FROM citas\nWHERE veterinario_id = {{ $('Execute a SQL query6').first().json.veterinario_id }}\nAND fecha = TO_DATE('{{ $('Webhook').first().json.body.mensaje.trim() }}', 'DD/MM/YYYY')\nAND estado = 'confirmado'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        784,
+        -720
+      ],
+      "id": "da8b3d28-1d92-4152-98ad-0e12f73002f5",
+      "name": "Execute a SQL query7",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const horasOcupadas = $input.all()\n  .map(c => c.json.hora?.slice(0,5))\n  .filter(Boolean);\n\nconst MANANA = [8, 9, 10, 11, 12];\nconst TARDE = [16, 17, 18, 20];\n\nconst buildBloques = (horas) => horas.map(h => {\n  const inicio = `${String(h).padStart(2,'0')}:00`;\n  const fin = `${String(h+1).padStart(2,'0')}:00`;\n  return { hora: inicio, label: `${inicio} - ${fin}`, disponible: !horasOcupadas.includes(inicio) };\n}).filter(b => b.disponible);\n\nconst bloquesManana = buildBloques(MANANA);\nconst bloquesTarde = buildBloques(TARDE);\n\nif (bloquesManana.length === 0 && bloquesTarde.length === 0) {\n  return [{ json: { \n    sinHorarios: true, \n    mensaje: \"No hay horarios disponibles para ese día. ¿Probamos otra fecha?\" \n  }}];\n}\n\nconst mapeo = {};\nlet contador = 1;\nlet lista = 'Estos son los horarios disponibles:\\n';\n\nif (bloquesManana.length > 0) {\n  lista += '\\nMAÑANA\\n';\n  bloquesManana.forEach(b => {\n    lista += `${contador}- ${b.label}\\n`;\n    mapeo[contador] = b.hora;\n    contador++;\n  });\n}\n\nif (bloquesTarde.length > 0) {\n  lista += '\\nTARDE\\n';\n  bloquesTarde.forEach(b => {\n    lista += `${contador}- ${b.label}\\n`;\n    mapeo[contador] = b.hora;\n    contador++;\n  });\n}\n\nreturn [{ json: {\n  mensaje: lista.trim(),\n  mapeo: JSON.stringify(mapeo),\n  cita_id: $('Execute a SQL query6').first().json.id,\n  fecha: $('Webhook').first().json.body.mensaje.trim()\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -720
+      ],
+      "id": "c612fae9-3ab8-4929-897e-ee2ff83a155e",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.cita_id }}",
+            "fecha": "={{ new Date($('Webhook').first().json.body.mensaje.trim().split('/').reverse().join('-')).toISOString().split('T')[0] }}",
+            "notas": "={{ $json.mapeo }}",
+            "estado": "esphora"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "veterinario_id",
+              "displayName": "veterinario_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1296,
+        -720
+      ],
+      "id": "f6c5c701-1161-4123-989e-0703c69b1f73",
+      "name": "Update rows in a table12",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"respuesta\": \"{{ $('Code in JavaScript2').first().json.mensaje.replace(/\\n/g, '\\\\n') }}\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1536,
+        -720
+      ],
+      "id": "bc65bb19-2e19-4348-be86-b880b5c87b1f",
+      "name": "Respond to Webhook21"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.id, c.veterinario_id, c.mascota_id, c.fecha, c.notas,\n       cl.nombre as vet_nombre, cl.apellido as vet_apellido,\n       m.nombre as mascota_nombre\nFROM citas c\nJOIN clientes cl ON cl.id = c.veterinario_id\nJOIN mascotas m ON m.id = c.mascota_id\nWHERE c.cliente_id = {{ $('Webhook').first().json.body.cliente_id }}\nAND c.estado = 'esphora'\nORDER BY c.created_at DESC\nLIMIT 1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        688,
+        -256
+      ],
+      "id": "5c6076eb-e8f1-465c-b2ef-1ef2ab00b9b4",
+      "name": "Execute a SQL query8",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cita = $input.first().json;\nconst mapeo = JSON.parse(cita.notas);\nconst opcion = $('Webhook').first().json.body.mensaje.trim();\nconst hora = mapeo[opcion];\n\nif (!hora) {\n  return [{ json: { error: true, respuesta: \"Opción inválida, elegí un número de la lista.\" }}];\n}\n\nconst horaFin = `${String(parseInt(hora.split(':')[0]) + 1).padStart(2,'0')}:00`;\n\n// Convertir fecha DD/MM/YYYY → YYYY-MM-DD para Google Calendar\nconst [dia, mes, anio] = cita.fecha.split('T')[0].split('-');\n// La fecha ya está en formato date de postgres: YYYY-MM-DD\nconst fechaISO = cita.fecha.split('T')[0]; // 2026-07-02\n\nreturn [{ json: {\n  cita_id: cita.id,\n  veterinario_id: cita.veterinario_id,\n  mascota_id: cita.mascota_id,\n  vet_nombre: `${cita.vet_nombre} ${cita.vet_apellido}`,\n  mascota_nombre: cita.mascota_nombre,\n  fecha: fechaISO,\n  hora: hora,\n  hora_fin: horaFin,\n  fecha_inicio_gcal: `${fechaISO}T${hora}:00-03:00`,  // ← agregás -03:00\n  fecha_fin_gcal: `${fechaISO}T${horaFin}:00-03:00`   // ← agregás -03:00\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        -256
+      ],
+      "id": "5271a893-5ade-4b24-8191-f0fc46052580",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.cita_id }}",
+            "hora": "={{ $json.hora.trim() + ':00' }}",
+            "estado": "confirmado"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "veterinario_id",
+              "displayName": "veterinario_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1520,
+        -96
+      ],
+      "id": "7be6b38e-6f2e-4ae6-b429-0b4957e16783",
+      "name": "Update rows in a table13",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "start": "={{ $('Code in JavaScript3').first().json.fecha_inicio_gcal }}",
+        "end": "={{ $('Code in JavaScript3').first().json.fecha_fin_gcal }}",
+        "additionalFields": {
+          "summary": "=Turno: {{ $('Code in JavaScript3').first().json.mascota_nombre }} - Dr/a. {{ $('Code in JavaScript3').first().json.vet_nombre }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1776,
+        -96
+      ],
+      "id": "0e2ed2d8-c1d5-49fb-b65d-3f4b0125949d",
+      "name": "Create an event1",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"respuesta\": \"✅ ¡Cita confirmada!\\n\\n🐾 Mascota: {{ $('Code in JavaScript3').first().json.mascota_nombre }}\\n👨‍⚕️ Veterinario: Dr/a. {{ $('Code in JavaScript3').first().json.vet_nombre }}\\n📅 Fecha: {{ $('Code in JavaScript3').first().json.fecha }}\\n🕐 Hora: {{ $('Code in JavaScript3').first().json.hora }} - {{ $('Code in JavaScript3').first().json.hora_fin }}\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2336,
+        -96
+      ],
+      "id": "5adc7de8-a4de-4ac5-9ce3-595ae6dd9980",
+      "name": "Respond to Webhook22"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.id, c.fecha, c.hora, c.estado,\n       cl.nombre || ' ' || cl.apellido AS vet_nombre\nFROM citas c\nLEFT JOIN clientes cl ON cl.id = c.veterinario_id\nWHERE c.mascota_id = {{ $json.mascota_id }}\nAND c.cliente_id = {{ $('Webhook').first().json.body.cliente_id }}\nAND c.estado = 'confirmado'\nAND c.fecha IS NOT NULL",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        992,
+        576
+      ],
+      "id": "730d7c76-486f-43e1-acda-28062bd9538f",
+      "name": "Execute a SQL query9",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Code in JavaScript3').first().json.cita_id }}",
+            "calendar_event_id": "={{ $('Create an event1').item.json.id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "veterinario_id",
+              "displayName": "veterinario_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2048,
+        -96
+      ],
+      "id": "52d67a2e-c383-4f2c-9e12-467379c703d0",
+      "name": "Update rows in a table14",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8f9b3fbf-5498-44f2-bd3d-38c62524dd2c",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        -1696
+      ],
+      "id": "208f2dde-373f-40b5-b6d8-7545db204de9",
+      "name": "If5"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"respuesta\": \"{{ $json.respuesta }}\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        784,
+        -1824
+      ],
+      "id": "7a7f2893-cbd8-4cf4-a343-a15cf9727141",
+      "name": "Respond to Webhook23"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8f9b3fbf-5498-44f2-bd3d-38c62524dd2c",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        -1184
+      ],
+      "id": "6b9e47a4-75e0-4d47-80f3-e21252cdbdf4",
+      "name": "If6"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"respuesta\": \"{{ $json.respuesta }}\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1152,
+        -1296
+      ],
+      "id": "7578275b-f880-4843-ba18-0dbdda8669d0",
+      "name": "Respond to Webhook24"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8f9b3fbf-5498-44f2-bd3d-38c62524dd2c",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1184,
+        -256
+      ],
+      "id": "3364453a-77d9-4626-8b43-f11f2858efa3",
+      "name": "If7"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"respuesta\": \"{{ $json.respuesta }}\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1520,
+        -352
+      ],
+      "id": "d9a35176-0a3f-4003-a105-f057dc66c844",
+      "name": "Respond to Webhook25"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.id, c.fecha, c.hora, c.veterinario_id,\n       cl.nombre || ' ' || cl.apellido AS vet_nombre\nFROM citas c\nLEFT JOIN clientes cl ON cl.id = c.veterinario_id\nWHERE c.mascota_id = {{ $json.mascota_id }}\nAND c.cliente_id = {{ $('Webhook').first().json.body.cliente_id }}\nAND c.estado = 'confirmado'\nAND c.fecha IS NOT NULL",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        928,
+        1600
+      ],
+      "id": "2f14fc55-02ac-43e6-9aff-f5716c5bce1e",
+      "name": "Execute a SQL query10",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "notas": "={{ '{\"cita_id\":' + $json.cita_id + ',\"veterinario_id\":' + $json.veterinario_id + '}' }}",
+            "estado": "espreprogramar",
+            "id": "={{ $('Switch').first().json.id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "veterinario_id",
+              "displayName": "veterinario_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        2096
+      ],
+      "id": "9a2aa837-09a1-4679-bc5b-4083794d2826",
+      "name": "Update rows in a table10",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id, \n  (notas::json->>'veterinario_id')::int AS veterinario_id,\n  (notas::json->>'cita_id')::int AS cita_id\nFROM citas\nWHERE cliente_id = {{ $('Webhook').first().json.body.cliente_id }}\nAND estado = 'espreprogramar'\nORDER BY created_at DESC\nLIMIT 1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        496,
+        2608
+      ],
+      "id": "a1a63e04-2c28-4085-8e87-5db181d42ca6",
+      "name": "Execute a SQL query11",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT hora FROM citas\nWHERE veterinario_id = {{ $('Execute a SQL query11').first().json.veterinario_id }}\nAND fecha = TO_DATE('{{ $('Webhook').first().json.body.mensaje.trim() }}', 'DD/MM/YYYY')\nAND estado = 'confirmado'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        800,
+        2608
+      ],
+      "id": "50e50437-d8b0-441f-bec9-776753099cc0",
+      "name": "Execute a SQL query12",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const horasOcupadas = $input.all()\n  .map(c => c.json.hora?.slice(0,5))\n  .filter(Boolean);\n\nconst MANANA = [8, 9, 10, 11, 12];\nconst TARDE = [16, 17, 18, 20];\n\nconst buildBloques = (horas) => horas.map(h => {\n  const inicio = `${String(h).padStart(2,'0')}:00`;\n  const fin = `${String(h+1).padStart(2,'0')}:00`;\n  return { hora: inicio, label: `${inicio} - ${fin}`, disponible: !horasOcupadas.includes(inicio) };\n}).filter(b => b.disponible);\n\nconst bloquesManana = buildBloques(MANANA);\nconst bloquesTarde = buildBloques(TARDE);\n\nif (bloquesManana.length === 0 && bloquesTarde.length === 0) {\n  return [{ json: { \n    sinHorarios: true, \n    mensaje: \"No hay horarios disponibles para ese día. ¿Probamos otra fecha?\" \n  }}];\n}\n\nconst mapeo = {};\nlet contador = 1;\nlet lista = 'Estos son los horarios disponibles:\\n';\n\nif (bloquesManana.length > 0) {\n  lista += '\\nMAÑANA\\n';\n  bloquesManana.forEach(b => {\n    lista += `${contador}- ${b.label}\\n`;\n    mapeo[contador] = b.hora;\n    contador++;\n  });\n}\n\nif (bloquesTarde.length > 0) {\n  lista += '\\nTARDE\\n';\n  bloquesTarde.forEach(b => {\n    lista += `${contador}- ${b.label}\\n`;\n    mapeo[contador] = b.hora;\n    contador++;\n  });\n}\n\n// Guardamos horarios Y cita_id_real juntos en un solo JSON,\n// para que sobrevivan al siguiente turno (nueva ejecución del workflow)\nconst notasGuardar = JSON.stringify({\n  horarios: mapeo,\n  cita_id_real: $('Execute a SQL query11').first().json.cita_id\n});\n\nreturn [{ json: {\n  mensaje: lista.trim(),\n  notas_guardar: notasGuardar,   // ← esto va al campo \"notas\" en Update rows in a table15\n  cita_id_temporal: $('Execute a SQL query11').first().json.id,   // la fila temporal (575)\n  fecha: $('Webhook').first().json.body.mensaje.trim()\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        2608
+      ],
+      "id": "dd708688-a027-4458-89ae-930d46d5f3f3",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "citas",
+          "mode": "list",
+          "cachedResultName": "citas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.cita_id_temporal }}",
+            "fecha": "={{ new Date($('Webhook').first().json.body.mensaje.trim().split('/').reverse().join('-')).toISOString().split('T')[0] }}",
+            "notas": "={{ $json.notas_guardar }}",
+            "estado": "reprehora"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mascota_id",
+              "displayName": "mascota_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "time",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "veterinario_id",
+              "displayName": "veterinario_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1312,
+        2608
+      ],
+      "id": "15769b72-f46e-41ee-a9a2-8ed2635ab410",
+      "name": "Update rows in a table15",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"respuesta\": \"{{ $('Code in JavaScript4').first().json.mensaje.replace(/\\n/g, '\\\\n') }}\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1616,
+        2608
+      ],
+      "id": "24a06acd-7f7c-4949-9d36-b04fecfe6b84",
+      "name": "Respond to Webhook26"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fila = $input.first().json; // fila con notas = {\"horarios\":{...}, \"cita_id_real\":542}\nconst data = JSON.parse(fila.notas);\nconst mapeo = data.horarios;\nconst cita_id_real = data.cita_id_real;\n\nconst opcion = $('Webhook').first().json.body.mensaje.trim();\nconst hora = mapeo[opcion];\n\nif (!hora) {\n  return [{ json: { error: true, respuesta: \"Opción inválida, elegí un número de la lista.\" }}];\n}\n\nconst horaFin = `${String(parseInt(hora.split(':')[0]) + 1).padStart(2,'0')}:00`;\nconst fechaISO = fila.fecha.split('T')[0];\n\nreturn [{ json: {\n  cita_id_temporal: fila.id,\n  cita_id_real: cita_id_real,\n  fecha: fechaISO,\n  hora: hora,\n  hora_fin: horaFin,\n  fecha_inicio_gcal: `${fechaISO}T${hora}:00-03:00`,\n  fecha_fin_gcal: `${fechaISO}T${horaFin}:00-03:00`\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        3232
+      ],
+      "id": "7b002bee-b9d5-4236-9f0d-07efa4608255",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE citas\nSET fecha = '{{ $json.fecha }}',\n    hora = '{{ $json.hora }}:00',\n    estado = 'confirmado'\nWHERE id = {{ $json.cita_id_real }}\nRETURNING id, calendar_event_id, veterinario_id, mascota_id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        832,
+        3232
+      ],
+      "id": "60a9545b-af1d-4b0a-8c97-85ceec2724b3",
+      "name": "Execute a SQL query2",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE citas SET estado = 'inactiva', notas = NULL\nWHERE id = {{ $('Code in JavaScript6').first().json.cita_id_temporal }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1712,
+        3232
+      ],
+      "id": "6dc379e9-2c6f-4925-9c50-2fe7ab94e609",
+      "name": "Execute a SQL query3",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT cl.nombre || ' ' || cl.apellido AS vet_nombre, m.nombre AS mascota_nombre\nFROM clientes cl, mascotas m\nWHERE cl.id = {{ $json.veterinario_id }}\nAND m.id = {{ $json.mascota_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1136,
+        3232
+      ],
+      "id": "160b5ed4-eb84-48c2-aa19-cdd6a595b21e",
+      "name": "Execute a SQL query13",
+      "credentials": {
+        "postgres": {
+          "id": "NyMLNz8IN0o5KoAM",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "hernanxddante@gmail.com",
+          "mode": "list",
+          "cachedResultName": "hernanxddante@gmail.com"
+        },
+        "eventId": "={{ $('Execute a SQL query2').first().json.calendar_event_id }}",
+        "updateFields": {
+          "end": "={{ $('Code in JavaScript6').first().json.fecha_fin_gcal }}",
+          "start": "={{ $('Code in JavaScript6').first().json.fecha_inicio_gcal }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1440,
+        3232
+      ],
+      "id": "bfec707c-7b9c-4eb2-b03e-f4952bc49d20",
+      "name": "Update an event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ALUK5vvEnRNgT2SW",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"respuesta\": \"✅ ¡Cita reprogramada correctamente!\\n\\n🐾 Mascota: {{ $json.mascota_nombre }}\\n👨‍⚕️ Veterinario: Dr/a. {{ $json.vet_nombre }}\\n📅 Nueva fecha: {{ $('Code in JavaScript6').first().json.fecha }}\\n🕐 Nueva hora: {{ $('Code in JavaScript6').first().json.hora }} - {{ $('Code in JavaScript6').first().json.hora_fin }}\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1984,
+        3232
+      ],
+      "id": "9ac957a7-97a5-4cf8-9750-4c496d687cfa",
+      "name": "Respond to Webhook27"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "de texto a json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "agendando",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "cancelando",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "cancefeho",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "reprogramando1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "reprofeho",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query11",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "de texto a json": {
+      "main": [
+        [
+          {
+            "node": "determina estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "determina estado": {
+      "main": [
+        [
+          {
+            "node": "agendar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "consulta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "reprogramando",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "cancelar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "saludo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Select rows from a table1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript11": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reprogramando": {
+      "main": [
+        [
+          {
+            "node": "Select rows from a table3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consulta": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agendar": {
+      "main": [
+        [
+          {
+            "node": "Select rows from a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancelar": {
+      "main": [
+        [
+          {
+            "node": "Select rows from a table4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table4": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript12": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table5": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript15": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook18",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript17": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table9": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook19",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table8": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Delete an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete an event": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agendando": {
+      "main": [
+        [
+          {
+            "node": "If5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reprogramando1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reprofeho": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancelando": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancefeho": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query5": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table11": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook20",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query6": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query7": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table12": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook21",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query8": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "If7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table13": {
+      "main": [
+        [
+          {
+            "node": "Create an event1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event1": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query9": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript17",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table14": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook22",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If5": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook23",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update rows in a table1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If6": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook24",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update rows in a table11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If7": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook25",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update rows in a table13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query10": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table10": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query11": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query12": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Update rows in a table15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update rows in a table15": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook26",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query2": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query13": {
+      "main": [
+        [
+          {
+            "node": "Update an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook27",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an event": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "17391807-e769-4545-921e-1326995f583e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f107b2a004d026315b55c7606b549f9003a626f56317ab9dba88fdeebdc0b61f"
+  },
+  "id": "whiqnyzmTwHHLu6T",
+  "tags": []
+}

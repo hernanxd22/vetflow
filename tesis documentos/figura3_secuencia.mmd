@@ -1,0 +1,53 @@
+%% Figura 3 — Secuencia del flujo de agendamiento (VetFlow)
+%%
+%% Fuente de la figura ya incorporada al documento (VetFlow_Tesis_v7.docx).
+%% Se conserva para poder regenerarla si el flujo cambia.
+%%
+%% Verificado contra el workflow actu9 (nodos Code in JavaScript2 / Execute a SQL query7):
+%%   - 26 mensajes sobre 6 lineas de vida.
+%%   - Sin nodo de verificacion de conflicto: el solapamiento se previene al construir
+%%     la lista de bloques (mensajes 17-20), no se detecta despues.
+%%   - Numeracion de bloques con contador unico: manana ocupa 1-5 y tarde 6-10,
+%%     por eso las 16:00 son la opcion "6" y no la "3".
+%%
+%% Correspondencia con la Nota al pie de la figura:
+%%   4-9    seleccion de mascota
+%%   10-14  seleccion de veterinario
+%%   15-20  fecha y construccion de la lista de horarios
+%%   21-26  eleccion del bloque y confirmacion
+
+sequenceDiagram
+    autonumber
+    participant U as Usuario
+    participant R as React SPA
+    participant F as FastAPI
+    participant N as n8n
+    participant P as PostgreSQL
+    participant G as Google Calendar
+
+    U->>R: "Quiero sacar un turno"
+    R->>F: POST /api/chat
+    F->>N: Webhook + mensaje
+    N->>P: INSERT cita (estado=agendando)
+    N->>P: SELECT mascotas del cliente
+    P-->>N: lista de mascotas
+    N-->>U: "¿Para que mascota queres agendar?"
+    U->>N: "1" (Rex)
+    N->>P: UPDATE mascota_id, estado=espaveterinario
+    N->>P: SELECT veterinarios activos
+    P-->>N: lista de veterinarios
+    N-->>U: "¿A que veterinario le asignamos esta cita?"
+    U->>N: "2" (Luis)
+    N->>P: UPDATE veterinario_id, estado=espfecha
+    N-->>U: "¿Para que fecha? (DD/MM/AAAA)"
+    U->>N: "07/08/2026"
+    N->>P: SELECT horas ocupadas (veterinario + fecha)
+    P-->>N: horas ocupadas
+    N->>P: UPDATE fecha, estado=esphora, mapeo 1..10
+    N-->>U: bloques disponibles (manana 1-5 / tarde 6-10)
+    U->>N: "6" (16:00hs)
+    N->>P: UPDATE hora, estado=confirmado
+    N->>G: CREATE event
+    G-->>N: evento creado
+    N->>P: UPDATE calendar_event_id
+    N-->>U: "¡Cita confirmada!" (Rex · Luis · 07/08 · 16:00-17:00)

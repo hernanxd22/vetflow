@@ -14,11 +14,25 @@ def get_uow(db: Session = Depends(get_db)) -> UnitOfWork:
     return UnitOfWork(db)
 
 
+def _verificar_acceso_a_mascota(mascota_id: int, uow: UnitOfWork, user: CurrentUser) -> None:
+    """Un cliente solo accede al historial de sus propias mascotas."""
+    if user.is_cliente and not uow.mascotas.get_by_id(mascota_id, user.cliente_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esa mascota no te pertenece",
+        )
+
+
 @router.get(
     "/mascotas/{mascota_id}/historial",
     response_model=List[HistorialResponse]
 )
-def listar_historial(mascota_id: int, uow: UnitOfWork = Depends(get_uow)):
+def listar_historial(
+    mascota_id: int,
+    uow: UnitOfWork = Depends(get_uow),
+    user: CurrentUser = Depends(get_current_user),
+):
+    _verificar_acceso_a_mascota(mascota_id, uow, user)
     return historial_service.get_all(mascota_id, uow)
 
 

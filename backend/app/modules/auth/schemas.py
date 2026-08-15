@@ -14,9 +14,11 @@ class LoginRequest(BaseModel):
     password: str
 
 class AuthResponse(BaseModel):
-    cliente_id: int
-    nombre:     str
-    apellido:   str
-    dni:        str
-    username:   str
-    rol:        str
+    cliente_id:   int
+    nombre:       str
+    apellido:     str
+    dni:          str
+    username:     str
+    rol:          str
+    access_token: str
+    token_type:   str = "bearer"

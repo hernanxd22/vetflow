@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from passlib.context import CryptContext
+from app.core.security import create_access_token
 from app.core.unit_of_work import UnitOfWork
 from app.modules.auth.schemas import RegisterRequest, LoginRequest, AuthResponse
 
@@ -23,7 +24,8 @@ class AuthService:
             return AuthResponse(
                 cliente_id=cliente.id, nombre=cliente.nombre,
                 apellido=cliente.apellido, dni=cliente.dni, username=cliente.username,
-                rol=cliente.rol
+                rol=cliente.rol,
+                access_token=create_access_token(cliente.id)
             )
 
     def login(self, data: LoginRequest, uow: UnitOfWork) -> AuthResponse:
@@ -31,10 +33,14 @@ class AuthService:
         if not cliente or not pwd_context.verify(data.password, cliente.password):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario o contraseña incorrectos")
 
+        if cliente.estado and cliente.estado != "activo":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cuenta está desactivada")
+
         return AuthResponse(
             cliente_id=cliente.id, nombre=cliente.nombre,
             apellido=cliente.apellido, dni=cliente.dni, username=cliente.username,
-            rol=cliente.rol
+            rol=cliente.rol,
+            access_token=create_access_token(cliente.id)
         )
 
 auth_service = AuthService()

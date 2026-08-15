@@ -28,6 +28,8 @@ def update_veterinario(id: int, data: VeterinarioUpdate, db: Session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veterinario no encontrado")
 
     vet = repository.update(db, vet, data.telefono, data.estado)
+    db.commit()
+    db.refresh(vet)
     return VeterinarioResponse(
         id=vet.id,
         nombre=vet.nombre,

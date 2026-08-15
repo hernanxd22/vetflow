@@ -3,6 +3,30 @@ import { useNavigate } from 'react-router-dom'
 
 const API = import.meta.env.VITE_API_URL || 'https://proyec1-server.bxyea0.easypanel.host/api'
 
+// ─── Auth ─────────────────────────────────────────────────
+function getToken(): string {
+  return sessionStorage.getItem('access_token') || ''
+}
+
+// Builds the headers every authenticated request needs.
+function authHeaders(withJson = false): Record<string, string> {
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (withJson) headers['Content-Type'] = 'application/json'
+  return headers
+}
+
+// Sends the user back to the login screen when the session is no longer valid.
+function sesionExpirada(res: Response): boolean {
+  if (res.status === 401) {
+    sessionStorage.clear()
+    window.location.href = '/login'
+    return true
+  }
+  return false
+}
+
 // ─── Types ───────────────────────────────────────────────
 type Mascota = {
   id: number; nombre: string; especie: string; raza?: string
@@ -43,7 +67,7 @@ function ChatBubble({ msg }: { msg: ChatMsg }) {
 }
 
 // ─── Chat widget ──────────────────────────────────────────
-function ChatWidget({ clienteId, nombre }: { clienteId: string; nombre: string }) {
+function ChatWidget({ nombre }: { nombre: string }) {
   const [open, setOpen] = useState(false)
   const [msgs, setMsgs] = useState<ChatMsg[]>([{ role: 'bot', text: `¡Hola ${nombre}! 🐾 ¿En qué puedo ayudarte hoy? Podés pedirme agendar, reprogramar o cancelar un turno.` }])
   const [input, setInput] = useState('')
@@ -61,9 +85,10 @@ function ChatWidget({ clienteId, nombre }: { clienteId: string; nombre: string }
     try {
       const res = await fetch(`${API}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cliente_id: clienteId, mensaje: text }),
+        headers: authHeaders(true),
+        body: JSON.stringify({ mensaje: text }),
       })
+      if (sesionExpirada(res)) return
       const data = await res.json()
       setMsgs(m => [...m, { role: 'bot', text: data.respuesta || 'No pude procesar tu mensaje. Intentá de nuevo.' }])
     } catch {
@@ -157,7 +182,7 @@ export default function Inicio() {
   const apellido = sessionStorage.getItem('apellido') || ''
   const rol = sessionStorage.getItem('rol') || ''
 
-  useEffect(() => { if (!clienteId) navigate('/login') }, [clienteId, navigate])
+  useEffect(() => { if (!clienteId || !getToken()) navigate('/login') }, [clienteId, navigate])
 
   const [view, setView] = useState<View>('home')
   const [mascotas, setMascotas] = useState<Mascota[]>([])
@@ -239,9 +264,10 @@ export default function Inicio() {
     try {
       const res = await fetch(`${API}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cliente_id: clienteId, mensaje: text }),
+        headers: authHeaders(true),
+        body: JSON.stringify({ mensaje: text }),
       })
+      if (sesionExpirada(res)) return
       const data = await res.json()
       setMsgs2(m => [...m, { role: 'bot', text: data.respuesta || 'No pude procesar tu mensaje. Intentá de nuevo.' }])
     } catch {
@@ -260,8 +286,9 @@ export default function Inicio() {
     try {
       const url = (rol === 'veterinario' || rol === 'admin')
         ? `${API}/mascotas/todas`
-        : `${API}/mascotas/?cliente_id=${clienteId}`
-      const res = await fetch(url)
+        : `${API}/mascotas/`
+      const res = await fetch(url, { headers: authHeaders() })
+      if (sesionExpirada(res)) return
       const data = await res.json()
       setMascotas(Array.isArray(data) ? data : [])
     } catch { setMascotas([]) }
@@ -294,9 +321,9 @@ export default function Inicio() {
     }
     setEditSaving(true)
     try {
-      const res = await fetch(`${API}/mascotas/${mascotaId}?cliente_id=${clienteId}`, {
+      const res = await fetch(`${API}/mascotas/${mascotaId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(true),
         body: JSON.stringify({
           nombre: editForm.nombre.trim(),
           especie: editForm.especie,
@@ -320,14 +347,14 @@ export default function Inicio() {
     setLoadingCitas(true)
     try {
       const url = rol === 'cliente'
-        ? `${API}/citas/?cliente_id=${clienteId}`
+        ? `${API}/citas/`
         : rol === 'veterinario'
-        ? `${API}/citas/mis-citas-vet?cliente_id=${clienteId}`
+        ? `${API}/citas/mis-citas-vet`
         : `${API}/citas/admin`
-      const res = await fetch(url)
+      const res = await fetch(url, { headers: authHeaders() })
+      if (sesionExpirada(res)) return
       const data = await res.json()
       setCitas(Array.isArray(data) ? data : [])
-      data.forEach((c: any) => console.log('DEBUG cita fecha:', typeof c.fecha, JSON.stringify(c.fecha), 'vs dateStr formato YYYY-MM-DD'))
     } catch { setCitas([]) }
     finally { setLoadingCitas(false) }
   }
@@ -335,7 +362,8 @@ export default function Inicio() {
   async function cargarVeterinarios() {
     setLoadingVeterinarios(true)
     try {
-      const res = await fetch(`${API}/veterinarios/?cliente_id=${clienteId}`)
+      const res = await fetch(`${API}/veterinarios/`, { headers: authHeaders() })
+      if (sesionExpirada(res)) return
       const data = await res.json()
       setVeterinarios(Array.isArray(data) ? data : [])
     } catch { setVeterinarios([]) }
@@ -357,9 +385,9 @@ export default function Inicio() {
     setVetSaving(true)
     setVetEditMsg(null)
     try {
-      const res = await fetch(`${API}/veterinarios/${vetId}?cliente_id=${clienteId}`, {
+      const res = await fetch(`${API}/veterinarios/${vetId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(true),
         body: JSON.stringify({
           telefono: vetEditForm.telefono || null,
           estado: vetEditForm.estado,
@@ -388,7 +416,8 @@ export default function Inicio() {
   async function cargarHistorialData(mascotaId: number) {
     setLoadingHistorial(true)
     try {
-      const res = await fetch(`${API}/mascotas/${mascotaId}/historial?cliente_id=${clienteId}`)
+      const res = await fetch(`${API}/mascotas/${mascotaId}/historial`, { headers: authHeaders() })
+      if (sesionExpirada(res)) return
       const data = await res.json()
       setHistorialData(Array.isArray(data) ? data : [])
     } catch { setHistorialData([]) }
@@ -402,9 +431,9 @@ export default function Inicio() {
     if (!historialMascotaId) return
     setHSaving(true)
     try {
-      const res = await fetch(`${API}/mascotas/${historialMascotaId}/historial?cliente_id=${clienteId}`, {
+      const res = await fetch(`${API}/mascotas/${historialMascotaId}/historial`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(true),
         body: JSON.stringify({
           fecha: hFecha,
           tipo: hTipo,
@@ -433,7 +462,8 @@ export default function Inicio() {
   async function eliminarRegistroHistorial(id: number) {
     if (!confirm('¿Eliminar este registro del historial?')) return
     try {
-      const res = await fetch(`${API}/historial/${id}?cliente_id=${clienteId}`, { method: 'DELETE' })
+      const res = await fetch(`${API}/historial/${id}`, { method: 'DELETE', headers: authHeaders() })
+      if (sesionExpirada(res)) return
       if (!res.ok) throw new Error('Error al eliminar')
       if (historialSelected?.id === id) { setHistorialSelected(null); setHistorialView('list') }
       if (historialMascotaId) cargarHistorialData(historialMascotaId)
@@ -458,9 +488,9 @@ export default function Inicio() {
     if (!mNombre.trim() || !mEspecie) { setFormMsg({ type: 'error', text: 'El nombre y la especie son obligatorios.' }); return }
     setSaving(true)
     try {
-      const res = await fetch(`${API}/mascotas/?cliente_id=${clienteId}`, {
+      const res = await fetch(`${API}/mascotas/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(true),
         body: JSON.stringify({ 
         nombre: mNombre.trim(), 
         especie: mEspecie, 
@@ -1606,7 +1636,7 @@ export default function Inicio() {
       </main>
 
       {/* Chat widget flotante */}
-      {view !== 'chat' && <ChatWidget clienteId={clienteId} nombre={nombre.split(' ')[0] || 'usuario'} />}
+      {view !== 'chat' && <ChatWidget nombre={nombre.split(' ')[0] || 'usuario'} />}
     </div>
   )
 }

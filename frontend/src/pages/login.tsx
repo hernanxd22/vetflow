@@ -32,7 +32,8 @@ export default function Login() {
         body: JSON.stringify({ username: username.trim(), password }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al iniciar sesión')
+      if (!res.ok) throw new Error(data.detail || data.error || 'Error al iniciar sesión')
+      sessionStorage.setItem('access_token', data.access_token)
       sessionStorage.setItem('cliente_id', data.cliente_id)
       sessionStorage.setItem('nombre', data.nombre)
       sessionStorage.setItem('apellido', data.apellido)
