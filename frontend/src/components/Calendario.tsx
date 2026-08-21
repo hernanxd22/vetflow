@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { BadgeEstado, BloqueEvento, LineaEvento } from './EventoCita'
 import { ESTADOS_VISIBLES, estiloEstado, horaCorta, type CitaCalendario } from './citas'
+import { ymdLocal as ymd } from '../shared'
 
 // The clinic works 08:00–13:00 and 16:00–21:00, so the grid spans the whole
 // working day and greys out the gap in between.
@@ -16,13 +17,6 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
   'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
 type Modo = 'mes' | 'semana' | 'dia'
-
-// Local calendar date as YYYY-MM-DD. Never use toISOString() for this: it
-// converts to UTC, so in Argentina (UTC-3) everything after 21:00 reports the
-// following day and "today" lands on the wrong column.
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 function lunesDe(d: Date): Date {
   const n = new Date(d)

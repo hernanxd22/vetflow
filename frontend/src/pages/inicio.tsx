@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Calendario from '../components/Calendario'
+import Home from '../components/Home'
 import type { CitaCalendario } from '../components/citas'
+import { emojis, ymdLocal, type View } from '../shared'
 
 const API = import.meta.env.VITE_API_URL || 'https://proyec1-server.bxyea0.easypanel.host/api'
 
@@ -35,19 +37,6 @@ type Mascota = {
   fecha_nacimiento?: string; peso?: number; notas_medicas?: string
 }
 type ChatMsg = { role: 'user' | 'bot'; text: string }
-type View = 'home' | 'registrar' | 'mascotas' | 'chat' | 'citas' | 'admin' | 'historial' | 'veterinarios'
-
-// ─── Fechas ───────────────────────────────────────────────
-// Local calendar date as YYYY-MM-DD. toISOString() reports UTC, so in Argentina
-// (UTC-3) anything after 21:00 is already reported as the next day and every
-// date comparison built on it shifts by one.
-function ymdLocal(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-// ─── Emoji helper ─────────────────────────────────────────
-const emojis: Record<string, string> = { perro: '🐶', gato: '🐱', conejo: '🐰', pajaro: '🐦', hamster: '🐹', otro: '🐾' }
-
 // ─── Loading dots ─────────────────────────────────────────
 function LoadingDots() {
   return (
@@ -524,11 +513,27 @@ export default function Inicio() {
     setCitasFiltroTexto('')
     setCitasFiltroEstado('todas')
     setCitasFiltroFecha('todas')
+    if (v === 'home') cargarDatosHome()
     if (v === 'mascotas') cargarMascotas()
     if (v === 'citas') cargarCitas()
     if (v === 'admin') { cargarCitas(); cargarMascotas(); cargarVeterinarios() }
     if (v === 'veterinarios') cargarVeterinarios()
   }
+
+  // The dashboard summarises citas, mascotas and — for the admin — the vet
+  // roster, so it needs all three lists loaded before anything is rendered.
+  function cargarDatosHome() {
+    cargarCitas()
+    cargarMascotas()
+    if (rol === 'admin') cargarVeterinarios()
+  }
+
+  // 'home' is the landing view, so it never went through switchView and its
+  // data was never fetched. Load it once on mount.
+  useEffect(() => {
+    if (clienteId && getToken()) cargarDatosHome()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleGuardar(e: React.FormEvent) {
     e.preventDefault()
@@ -673,61 +678,15 @@ export default function Inicio() {
 
         {/* HOME */}
         {view === 'home' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <section style={{
-              minHeight: '100vh', background: 'linear-gradient(135deg, var(--navy) 0%, #1a6b5a 50%, var(--teal) 100%)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              textAlign: 'center', padding: '80px 48px 100px', position: 'relative', overflow: 'hidden',
-            }}>
-              <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 20% 80%, rgba(27,191,160,0.2) 0%, transparent 55%), radial-gradient(ellipse at 80% 20%, rgba(15,157,126,0.15) 0%, transparent 50%)', pointerEvents: 'none' }} />
-              <div style={{ fontSize: 48, marginBottom: 16, animation: 'float 3s ease-in-out infinite', position: 'relative' }}>🐾</div>
-              <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.9)', fontSize: '0.8rem', fontWeight: 500, padding: '6px 18px', borderRadius: 100, marginBottom: 28, position: 'relative' }}>
-                Sistema de turnos veterinarios
-              </div>
-              <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 'clamp(3rem,7vw,5.5rem)', fontWeight: 800, color: 'white', letterSpacing: -3, lineHeight: 1, marginBottom: 20, position: 'relative' }}>VetFlow</h1>
-              <p style={{ fontSize: '1.05rem', color: 'rgba(255,255,255,0.72)', maxWidth: 460, lineHeight: 1.75, fontWeight: 300, marginBottom: 36, position: 'relative' }}>
-                Hola, <span style={{ color: 'var(--teal-mid)', fontWeight: 500 }}>{nombre.split(' ')[0] || 'usuario'}</span>. Gestioná los turnos de tus mascotas en segundos.
-              </p>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', position: 'relative' }}>
-                {rol === 'cliente' && (
-                  <button onClick={() => switchView('registrar')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'white', color: 'var(--navy)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.95rem', fontWeight: 500, padding: '14px 30px', borderRadius: 100, border: 'none', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
-                    + Registrar mascota
-                  </button>
-                )}
-                {(rol === 'veterinario' || rol === 'admin') && (
-                  <button onClick={() => switchView('mascotas')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'white', color: 'var(--navy)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.95rem', fontWeight: 500, padding: '14px 30px', borderRadius: 100, border: 'none', cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
-                    Ver mascotas
-                  </button>
-                )}
-              </div>
-            </section>
-
-            <section style={{ padding: '96px 48px', background: 'var(--cream)' }}>
-              <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-                <p style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--teal)', marginBottom: 14 }}>Nuestros servicios</p>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 'clamp(1.7rem,3.5vw,2.4rem)', fontWeight: 700, color: 'var(--text)', marginBottom: 52, letterSpacing: -1 }}>Todo lo que tu mascota necesita</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 22 }}>
-                  {[
-                    { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>, title: 'Consultas veterinarias', desc: 'Atención médica completa y personalizada para todas tus mascotas.' },
-                    { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>, title: 'Vacunación segura', desc: 'Protocolos actualizados para mantener la salud de tu mascota protegida.' },
-                    { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>, title: 'Peluquería y baño', desc: 'Servicios de estética profesional para que tu mascota luzca genial.' },
-                  ].map((s, i) => (
-                    <div key={i} style={{ background: 'white', border: '1px solid rgba(15,157,126,0.1)', borderRadius: 20, padding: '36px 28px' }}>
-                      <div style={{ width: 50, height: 50, background: 'var(--teal-light)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 22, color: 'var(--teal)' }}>
-                        <div style={{ width: 22, height: 22 }}>{s.icon}</div>
-                      </div>
-                      <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>{s.title}</h3>
-                      <p style={{ fontSize: '0.88rem', color: 'var(--muted)', lineHeight: 1.7 }}>{s.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <footer style={{ background: 'var(--navy)', padding: '24px 48px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>
-              © 2026 VetFlow — Sistema de turnos veterinarios
-            </footer>
-          </div>
+          <Home
+            rol={rol}
+            nombre={nombre}
+            citas={citas}
+            mascotas={mascotas}
+            cantidadVeterinarios={veterinarios.length}
+            loading={loadingCitas || loadingMascotas}
+            onIr={switchView}
+          />
         )}
 
         {/* REGISTRAR */}
@@ -1098,33 +1057,6 @@ export default function Inicio() {
                       })()}
                     </tbody>
                   </table>
-                </div>
-              )}
-
-              {/* Horarios de atención */}
-              {citas.length > 0 && (
-                <div style={{ marginTop: 48 }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--teal)', marginBottom: 16 }}>Horarios de atención</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
-                    <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                      <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #FFD54F, #FFB300)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                      </div>
-                      <div>
-                        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Mañana</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--muted)', lineHeight: 1.6 }}>Lunes a Viernes<br/>8:00 – 13:00</div>
-                      </div>
-                    </div>
-                    <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                      <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #7C4DFF, #536DFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                      </div>
-                      <div>
-                        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Tarde</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--muted)', lineHeight: 1.6 }}>Lunes a Viernes<br/>17:00 – 21:00</div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
