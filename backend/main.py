@@ -18,18 +18,31 @@ from sqlalchemy import text
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     with engine.connect() as conn:
+        # mascota_id, fecha y hora admiten NULL a propósito: la máquina de estados
+        # conversacional inserta la fila al iniciar el flujo y la completa paso a paso.
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS citas (
                 id SERIAL PRIMARY KEY,
                 cliente_id INTEGER NOT NULL REFERENCES clientes(id),
-                mascota_id INTEGER NOT NULL REFERENCES mascotas(id),
-                fecha DATE NOT NULL,
-                hora TIME NOT NULL,
-                estado VARCHAR(20) NOT NULL DEFAULT 'confirmado',
+                mascota_id INTEGER REFERENCES mascotas(id),
+                veterinario_id INTEGER REFERENCES clientes(id),
+                fecha DATE,
+                hora TIME,
+                servicio VARCHAR(100),
+                estado VARCHAR(20),
+                notas TEXT,
+                calendar_event_id VARCHAR(255),
                 created_at TIMESTAMPTZ DEFAULT NOW()
             )
         """))
-        conn.execute(text("ALTER TABLE citas ADD COLUMN IF NOT EXISTS veterinario_id INTEGER REFERENCES clientes(id)"))
+        # Columnas incorporadas después de la creación original de la tabla.
+        for ddl in (
+            "ALTER TABLE citas ADD COLUMN IF NOT EXISTS veterinario_id INTEGER REFERENCES clientes(id)",
+            "ALTER TABLE citas ADD COLUMN IF NOT EXISTS servicio VARCHAR(100)",
+            "ALTER TABLE citas ADD COLUMN IF NOT EXISTS notas TEXT",
+            "ALTER TABLE citas ADD COLUMN IF NOT EXISTS calendar_event_id VARCHAR(255)",
+        ):
+            conn.execute(text(ddl))
         conn.commit()
     yield
 

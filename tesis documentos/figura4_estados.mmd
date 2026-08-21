@@ -1,0 +1,48 @@
+%% Figura 4 — Máquina de estados conversacional de VetFlow
+%%
+%% Derivada de actu10.json: 13 estados, verificados contra las salidas del nodo Switch
+%% y contra los nodos que escriben la columna "estado" de la tabla citas.
+%%
+%% Regla transversal no dibujada para no saturar el diagrama: ante una opción fuera de
+%% la lista o un mensaje ajeno al flujo, el estado se mantiene y se repite la pregunta.
+
+stateDiagram-v2
+    classDef inicial fill:#4472C4,color:#FFFFFF,stroke:#2F528F,stroke-width:1px
+    classDef espera fill:#FFFFFF,color:#1A1A1A,stroke:#8497B0,stroke-width:1px
+    classDef vigente fill:#548235,color:#FFFFFF,stroke:#375623,stroke-width:1px
+    classDef cierre fill:#C55A11,color:#FFFFFF,stroke:#843C0C,stroke-width:1px
+
+    state "AGENDAMIENTO" as A {
+        [*] --> agendando
+        agendando --> espaveterinario: mascota válida
+        espaveterinario --> espfecha: veterinario válido
+        espfecha --> esphora: fecha hábil
+        esphora --> confirmado: bloque libre elegido
+    }
+
+    state "REPROGRAMACIÓN" as R {
+        [*] --> reprogramando
+        reprogramando --> reprofeho: mascota válida
+        reprofeho --> espreprogramar: cita elegida
+        espreprogramar --> reprehora: fecha hábil
+        reprehora --> confirmado2: bloque libre elegido
+        reprehora --> inactiva: fila temporal
+    }
+
+    state "CANCELACIÓN" as C {
+        [*] --> cancelando
+        cancelando --> cancefeho: mascota válida
+        cancefeho --> cancelado: cita elegida
+        cancefeho --> eliminada: fila temporal
+    }
+
+    confirmado: confirmado (turno vigente)
+    confirmado2: confirmado (cita real actualizada)
+    inactiva: inactiva (fila temporal sin efecto)
+    cancelado: cancelado (turno dado de baja)
+    eliminada: fila temporal eliminada
+
+    class agendando,reprogramando,cancelando inicial
+    class espaveterinario,espfecha,esphora,reprofeho,espreprogramar,reprehora,cancefeho espera
+    class confirmado,confirmado2 vigente
+    class cancelado,inactiva,eliminada cierre

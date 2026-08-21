@@ -1,0 +1,84 @@
+%% Figura 1 — Arquitectura de alto nivel de VetFlow
+%% -
+%% Fuente reconstruida de la figura ya incorporada al documento. La versión previa se
+%% conservaba únicamente como imagen, lo que obligaba a editarla píxel a píxel; este
+%% archivo permite regenerarla cuando la arquitectura cambie.
+%% -
+%% Verificado contra el código y el workflow:
+%%   - Los seis módulos de la capa de lógica corresponden a los routers de FastAPI
+%%     (auth, chat, mascotas, citas, veterinarios, historial) y a la Tabla 5.
+%%   - Veterinarios expone GET y PATCH: la vista de administración lista y actualiza
+%%     el estado del profesional, pero no da de alta ni de baja cuentas. La asignación
+%%     de roles es manual sobre la columna rol, según el apartado 5.7.
+%%   - El historial médico figura en las tres vistas con el alcance que fija la Tabla 8.
+%%   - Las transiciones internas de n8n rotulan lo que ocurre en ellas —clasificación
+%%     de intención y enrutamiento— y no operaciones SQL: el AI Agent solo clasifica,
+%%     los nodos del workflow son los que operan sobre la base, según el apartado 5.4.
+
+flowchart TB
+    classDef usuario   fill:#DAE3F3,stroke:#2F528F,stroke-width:1px,color:#1A1A1A
+    classDef vAdmin    fill:#FFF2CC,stroke:#BF8F00,stroke-width:1px,color:#1A1A1A
+    classDef vVet      fill:#FBE5D6,stroke:#C55A11,stroke-width:1px,color:#1A1A1A
+    classDef vCli      fill:#E2EFDA,stroke:#375623,stroke-width:1px,color:#1A1A1A
+    classDef modulo    fill:#FFFFFF,stroke:#2F528F,stroke-width:1px,color:#1A1A1A
+    classDef n8nNodo   fill:#FFFFFF,stroke:#C55A11,stroke-width:1px,color:#1A1A1A
+    classDef datos     fill:#FFFFFF,stroke:#595959,stroke-width:1px,color:#1A1A1A
+
+    subgraph USUARIO["USUARIO FINAL"]
+        NAV["Navegador web<br/>(Chrome, Firefox, Safari)"]:::usuario
+    end
+
+    subgraph PRES["CAPA DE PRESENTACIÓN — React 19 SPA (Vite)"]
+        LOGIN["Login / Registro"]:::usuario
+        subgraph CLIV["Vista Cliente"]
+            CLIL["ChatWidget (agendar/reprogramar/<br/>cancelar/consultar)<br/>Mis mascotas (registrar/editar)<br/>Mis citas (propias)<br/>Historial médico (de sus mascotas)"]:::vCli
+        end
+        subgraph VETV["Vista Veterinario"]
+            VETL["Mascotas (todas)<br/>Mis citas (solo propias)<br/>Historial médico (alta y consulta)"]:::vVet
+        end
+        subgraph ADMIN["Vista Admin"]
+            ADMINL["Mascotas (todas)<br/>Veterinarios (listado y estado)<br/>Historial médico (alta, edición y baja)<br/>Calendario semanal (todas las citas)"]:::vAdmin
+        end
+    end
+
+    subgraph LOGICA["CAPA DE LÓGICA DE NEGOCIO — FastAPI 0.115 (Python 3.11)"]
+        AUTH["Auth<br/>(bcrypt + JWT)"]:::modulo
+        CHAT["Chat<br/>(proxy → n8n)"]:::modulo
+        MASC["Mascotas<br/>(CRUD)"]:::modulo
+        CITA["Citas<br/>(cliente/admin/vet)"]:::modulo
+        VETM["Veterinarios<br/>(solo admin)"]:::modulo
+        HIST["Historial médico<br/>(dueño y personal)"]:::modulo
+    end
+
+    subgraph IA["CAPA DE INTELIGENCIA CONVERSACIONAL — n8n (Docker, self-hosted)"]
+        WH["Webhook"]:::n8nNodo
+        AG["AI Agent<br/>(gpt-4o-mini vía OpenRouter)"]:::n8nNodo
+        SUB["Sub-flujos: agendar, reprogramar,<br/>cancelar, consultar, saludo, despedida"]:::n8nNodo
+        GCAL["Google Calendar API"]:::n8nNodo
+    end
+
+    subgraph DATOS["CAPA DE DATOS — PostgreSQL"]
+        DB[("clientes | mascotas<br/>citas | historial_medico")]:::datos
+    end
+
+    NAV -->|HTTPS| LOGIN
+    ADMINL -->|fetch HTTP| LOGICA
+    CHAT -->|POST /api/chat| WH
+    WH -->|clasifica intención| AG
+    AG -->|enruta por acción| SUB
+    SUB -->|crea/actualiza eventos| GCAL
+    SUB -->|SELECT/UPDATE/INSERT| DB
+    AUTH --> DB
+    MASC --> DB
+    CITA -->|SQL| DB
+    VETM --> DB
+    HIST --> DB
+
+    style USUARIO fill:#DAE3F3,stroke:#2F528F,stroke-width:2px
+    style PRES    fill:#E2EFDA,stroke:#375623,stroke-width:2px
+    style ADMIN   fill:#FFF9E6,stroke:#BF8F00,stroke-width:1px
+    style VETV    fill:#FDEFE6,stroke:#C55A11,stroke-width:1px
+    style CLIV    fill:#EDF5E6,stroke:#375623,stroke-width:1px
+    style LOGICA  fill:#DAE3F3,stroke:#2F528F,stroke-width:2px
+    style IA      fill:#FBE5D6,stroke:#C55A11,stroke-width:2px
+    style DATOS   fill:#EDEDED,stroke:#595959,stroke-width:2px

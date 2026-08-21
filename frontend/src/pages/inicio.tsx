@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Calendario from '../components/Calendario'
+import type { CitaCalendario } from '../components/citas'
 
 const API = import.meta.env.VITE_API_URL || 'https://proyec1-server.bxyea0.easypanel.host/api'
 
@@ -34,6 +36,14 @@ type Mascota = {
 }
 type ChatMsg = { role: 'user' | 'bot'; text: string }
 type View = 'home' | 'registrar' | 'mascotas' | 'chat' | 'citas' | 'admin' | 'historial' | 'veterinarios'
+
+// ─── Fechas ───────────────────────────────────────────────
+// Local calendar date as YYYY-MM-DD. toISOString() reports UTC, so in Argentina
+// (UTC-3) anything after 21:00 is already reported as the next day and every
+// date comparison built on it shifts by one.
+function ymdLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 // ─── Emoji helper ─────────────────────────────────────────
 const emojis: Record<string, string> = { perro: '🐶', gato: '🐱', conejo: '🐰', pajaro: '🐦', hamster: '🐹', otro: '🐾' }
@@ -204,21 +214,12 @@ export default function Inicio() {
   const [saving, setSaving] = useState(false)
 
   // Citas
-  type CitaCliente = { id: number; fecha: string; hora: string; estado: string; mascota_id: number; mascota_nombre: string }
-  type CitaAdmin = CitaCliente & { cliente_id: number; cliente_nombre: string }
-  const [citas, setCitas] = useState<(CitaCliente | CitaAdmin)[]>([])
+  const [citas, setCitas] = useState<CitaCalendario[]>([])
+  const [citasError, setCitasError] = useState<string | null>(null)
   const [loadingCitas, setLoadingCitas] = useState(false)
   const [citasFiltroTexto, setCitasFiltroTexto] = useState('')
   const [citasFiltroEstado, setCitasFiltroEstado] = useState('todas')
   const [citasFiltroFecha, setCitasFiltroFecha] = useState('todas')
-  const [weekStart, setWeekStart] = useState(() => {
-    const d = new Date()
-    const day = d.getDay()
-    const diff = day === 0 ? -6 : 1 - day
-    d.setDate(d.getDate() + diff)
-    d.setHours(0, 0, 0, 0)
-    return d
-  })
 
   // Historial
   type HistorialRegistro = { id: number; mascota_id: number; fecha: string; tipo: string; descripcion: string; diagnostico?: string; tratamiento?: string; notas?: string }
@@ -345,6 +346,7 @@ export default function Inicio() {
 
   async function cargarCitas() {
     setLoadingCitas(true)
+    setCitasError(null)
     try {
       const url = rol === 'cliente'
         ? `${API}/citas/`
@@ -353,10 +355,56 @@ export default function Inicio() {
         : `${API}/citas/admin`
       const res = await fetch(url, { headers: authHeaders() })
       if (sesionExpirada(res)) return
+      // A failed response used to fall through to an empty array, which showed
+      // "no hay citas" while the request had actually errored. Surface it.
+      if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`)
       const data = await res.json()
-      setCitas(Array.isArray(data) ? data : [])
-    } catch { setCitas([]) }
+      if (!Array.isArray(data)) throw new Error('El servidor devolvió una respuesta inesperada.')
+      setCitas(data)
+    } catch (err) {
+      setCitas([])
+      setCitasError(err instanceof Error ? err.message : 'No se pudieron cargar las citas.')
+    }
     finally { setLoadingCitas(false) }
+  }
+
+  // Single source of truth for the historial filters. The counter and the table
+  // used to run two hand-copied versions of this, which is how one of them ended
+  // up querying a field the client response never carries.
+  function citasFiltradas(): CitaCalendario[] {
+    const texto = citasFiltroTexto.trim().toLowerCase()
+    const hoy = ymdLocal(new Date())
+    return citas.filter(c => {
+      if (texto) {
+        const campos = [c.mascota_nombre, c.cliente_nombre, c.veterinario_nombre]
+          .filter(Boolean).join(' ').toLowerCase()
+        if (!campos.includes(texto)) return false
+      }
+      if (citasFiltroEstado !== 'todas' && c.estado !== citasFiltroEstado) return false
+      if (citasFiltroFecha === 'todas') return true
+
+      const fecha = c.fecha?.slice(0, 10)
+      if (!fecha) return false
+      if (citasFiltroFecha === 'hoy') return fecha === hoy
+      if (citasFiltroFecha === 'futuras') return fecha >= hoy
+      if (citasFiltroFecha === 'pasadas') return fecha < hoy
+
+      const d = new Date(fecha + 'T00:00:00')
+      const ahora = new Date()
+      if (citasFiltroFecha === 'semana') {
+        const inicio = new Date(ahora)
+        inicio.setDate(ahora.getDate() - ahora.getDay() + (ahora.getDay() === 0 ? -6 : 1))
+        inicio.setHours(0, 0, 0, 0)
+        const fin = new Date(inicio)
+        fin.setDate(inicio.getDate() + 6)
+        fin.setHours(23, 59, 59, 999)
+        return d >= inicio && d <= fin
+      }
+      if (citasFiltroFecha === 'mes') {
+        return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear()
+      }
+      return true
+    })
   }
 
   async function cargarVeterinarios() {
@@ -522,6 +570,23 @@ export default function Inicio() {
     </button>
   )
 
+  const bannerCitasError = () => citasError && (
+    <div style={{
+      margin: '24px 40px 0', padding: '14px 18px', borderRadius: 12,
+      background: 'rgba(229,62,62,0.08)', border: '1px solid rgba(229,62,62,0.25)',
+      color: 'var(--error)', fontSize: '0.88rem', display: 'flex',
+      alignItems: 'center', gap: 12,
+    }}>
+      <span style={{ fontSize: 18 }}>⚠</span>
+      <span style={{ flex: 1 }}>No se pudieron cargar las citas. {citasError}</span>
+      <button onClick={cargarCitas} style={{
+        border: '1px solid rgba(229,62,62,0.35)', background: 'white', color: 'var(--error)',
+        borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
+        fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 500,
+      }}>Reintentar</button>
+    </div>
+  )
+
   const inputStyle: React.CSSProperties = {
     padding: '13px 16px', border: '1.5px solid rgba(15,157,126,0.2)', borderRadius: 12,
     fontFamily: 'DM Sans, sans-serif', fontSize: '0.93rem', color: 'var(--text)',
@@ -574,14 +639,14 @@ export default function Inicio() {
               {navBtn('registrar', 'Registrar mascota', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>)}
               {navBtn('mascotas', 'Mis mascotas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>)}
               {navBtn('chat', 'Turnos / Chat', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>)}
-              {navBtn('citas', 'Mis citas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
+              {navBtn('citas', 'Calendario', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
             </>
           )}
 
           {rol === 'veterinario' && (
             <>
               {navBtn('mascotas', 'Mascotas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>)}
-              {navBtn('citas', 'Mis citas', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
+              {navBtn('citas', 'Calendario', <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>)}
             </>
           )}
 
@@ -905,63 +970,34 @@ export default function Inicio() {
         {/* CITAS */}
         {view === 'citas' && (
           rol === 'veterinario' ? (
-            <div style={{ padding: '48px 40px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-                <div>
-                  <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Mis citas</h3>
-                  <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Turnos asignados</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button onClick={() => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })} style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                  </button>
-                  <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)', minWidth: 140, textAlign: 'center' }}>
-                    {(() => { const end = new Date(weekStart); end.setDate(end.getDate() + 4); const fmt = (d: Date) => d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }); return `${fmt(weekStart)} – ${fmt(end)}` })()}
-                  </span>
-                  <button onClick={() => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })} style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                  </button>
-                </div>
-              </div>
-
-              {loadingCitas ? <LoadingDots /> : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
-                  {['Lun', 'Mar', 'Mié', 'Jue', 'Vie'].map((dia, i) => {
-                    const date = new Date(weekStart)
-                    date.setDate(date.getDate() + i)
-                    const dateStr = date.toISOString().slice(0, 10)
-                    const dayCitas = citas.filter(c => c.fecha === dateStr)
-                    const isToday = new Date().toISOString().slice(0, 10) === dateStr
-
-                    return (
-                      <div key={dia} style={{ background: 'white', border: isToday ? '2px solid var(--teal)' : '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
-                        <div style={{ background: isToday ? 'var(--teal)' : 'var(--teal-light)', padding: '10px 12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: isToday ? 'white' : 'var(--teal-dark)' }}>{dia}</div>
-                          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.15rem', fontWeight: 700, color: isToday ? 'white' : 'var(--teal-dark)', marginTop: 2 }}>{date.getDate()}</div>
-                        </div>
-                        <div style={{ padding: '8px', minHeight: 120 }}>
-                          {dayCitas.length === 0 ? (
-                            <div style={{ padding: '16px 8px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--muted)' }}>Sin citas</div>
-                          ) : (
-                            dayCitas.map(c => (
-                              <div key={c.id} style={{ padding: '8px 10px', marginBottom: 6, background: 'var(--cream)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>🐾 {(c as any).mascota_nombre} — {c.hora.slice(0, 5)}</div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{(c as any).cliente_nombre}</div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+            <>
+              {bannerCitasError()}
+              <Calendario
+                citas={citas}
+                loading={loadingCitas}
+                titulo="Calendario"
+                subtitulo="Los turnos asignados a tu agenda"
+                tituloEvento={c => `🐾 ${c.mascota_nombre || 'Sin mascota'}`}
+                subtituloEvento={c => c.cliente_nombre}
+                onVerHistorial={c => abrirHistorial(c.mascota_id!, c.mascota_nombre || 'Sin mascota')}
+              />
+            </>
           ) : (
-            <div style={{ padding: '48px 40px' }}>
+            <>
+              {bannerCitasError()}
+              <Calendario
+                citas={citas}
+                loading={loadingCitas}
+                titulo="Calendario"
+                subtitulo="Los turnos de tus mascotas"
+                tituloEvento={c => `🐾 ${c.mascota_nombre || 'Sin mascota'}`}
+                onVerHistorial={c => abrirHistorial(c.mascota_id!, c.mascota_nombre || 'Sin mascota')}
+              />
+
+            <div style={{ padding: '0 40px 48px' }}>
               <div style={{ marginBottom: 28 }}>
-                <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Mis citas</h3>
-                <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Turnos de tus mascotas</p>
+                <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Historial de turnos</h3>
+                <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Todos tus turnos, incluidos los cancelados</p>
               </div>
 
               {/* ── Filtros ── */}
@@ -978,7 +1014,6 @@ export default function Inicio() {
                   style={{ padding: '9px 14px', borderRadius: 100, border: '1.5px solid rgba(15,157,126,0.2)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', color: 'var(--text)', background: 'white', outline: 'none', cursor: 'pointer' }}>
                   <option value="todas">Todos los estados</option>
                   <option value="confirmado">Confirmadas</option>
-                  <option value="pendiente">Pendientes</option>
                   <option value="cancelado">Canceladas</option>
                   <option value="completado">Completadas</option>
                 </select>
@@ -996,28 +1031,7 @@ export default function Inicio() {
                 {citas.length > 0 && (
                   <span style={{ fontSize: '0.82rem', color: 'var(--muted)', marginLeft: 'auto' }}>
                     {(() => {
-                      const filtradas = citas.filter(c => {
-                        const text = citasFiltroTexto.trim().toLowerCase()
-                        if (text && !c.mascota_nombre.toLowerCase().includes(text) && !(c as any).cliente_nombre?.toLowerCase().includes(text)) return false
-                        if (citasFiltroEstado !== 'todas' && c.estado !== citasFiltroEstado) return false
-                        const hoy = new Date().toISOString().slice(0, 10)
-                        if (citasFiltroFecha === 'hoy' && c.fecha !== hoy) return false
-                        if (citasFiltroFecha === 'futuras' && c.fecha < hoy) return false
-                        if (citasFiltroFecha === 'pasadas' && c.fecha >= hoy) return false
-                        if (citasFiltroFecha === 'semana') {
-                          const d = new Date(c.fecha + 'T00:00:00')
-                          const hoyDate = new Date()
-                          const start = new Date(hoyDate); start.setDate(hoyDate.getDate() - hoyDate.getDay() + (hoyDate.getDay() === 0 ? -6 : 1))
-                          const end = new Date(start); end.setDate(start.getDate() + 6)
-                          if (d < start || d > end) return false
-                        }
-                        if (citasFiltroFecha === 'mes') {
-                          const d = new Date(c.fecha + 'T00:00:00')
-                          const hoyDate = new Date()
-                          if (d.getMonth() !== hoyDate.getMonth() || d.getFullYear() !== hoyDate.getFullYear()) return false
-                        }
-                        return true
-                      })
+                      const filtradas = citasFiltradas()
                       return `${filtradas.length} de ${citas.length}`
                     })()}
                   </span>
@@ -1043,28 +1057,7 @@ export default function Inicio() {
                     </thead>
                     <tbody>
                       {(() => {
-                        const filtradas = citas.filter(c => {
-                          const text = citasFiltroTexto.trim().toLowerCase()
-                          if (text && !c.mascota_nombre.toLowerCase().includes(text)) return false
-                          if (citasFiltroEstado !== 'todas' && c.estado !== citasFiltroEstado) return false
-                          const hoy = new Date().toISOString().slice(0, 10)
-                          if (citasFiltroFecha === 'hoy' && c.fecha !== hoy) return false
-                          if (citasFiltroFecha === 'futuras' && c.fecha < hoy) return false
-                          if (citasFiltroFecha === 'pasadas' && c.fecha >= hoy) return false
-                          if (citasFiltroFecha === 'semana') {
-                            const d = new Date(c.fecha + 'T00:00:00')
-                            const hoyDate = new Date()
-                            const start = new Date(hoyDate); start.setDate(hoyDate.getDate() - hoyDate.getDay() + (hoyDate.getDay() === 0 ? -6 : 1))
-                            const end = new Date(start); end.setDate(start.getDate() + 6)
-                            if (d < start || d > end) return false
-                          }
-                          if (citasFiltroFecha === 'mes') {
-                            const d = new Date(c.fecha + 'T00:00:00')
-                            const hoyDate = new Date()
-                            if (d.getMonth() !== hoyDate.getMonth() || d.getFullYear() !== hoyDate.getFullYear()) return false
-                          }
-                          return true
-                        })
+                        const filtradas = citasFiltradas()
 
                         if (filtradas.length === 0) return (
                           <tr><td colSpan={4} style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: '0.88rem' }}>Sin resultados con los filtros actuales.</td></tr>
@@ -1080,14 +1073,20 @@ export default function Inicio() {
                         return filtradas.map(c => (
                           <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
                             <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)', fontWeight: 500 }}>
-                              {new Date(c.fecha + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              {c.fecha
+                                ? new Date(c.fecha.slice(0, 10) + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                : 'Sin fecha'}
                             </td>
-                            <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)' }}>{c.hora.slice(0, 5)}</td>
+                            <td style={{ padding: '14px 20px', fontSize: '0.9rem', color: 'var(--text)' }}>{c.hora ? c.hora.slice(0, 5) : '--:--'}</td>
                             <td style={{ padding: '14px 20px', fontSize: '0.9rem' }}>
-                              <span onClick={() => { abrirHistorial((c as any).mascota_id, c.mascota_nombre) }}
-                                style={{ color: 'var(--teal-mid)', fontWeight: 500, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }} title="Ver historial médico">
-                                🐾 {c.mascota_nombre}
-                              </span>
+                              {c.mascota_id != null ? (
+                                <span onClick={() => abrirHistorial(c.mascota_id!, c.mascota_nombre || 'Sin mascota')}
+                                  style={{ color: 'var(--teal-mid)', fontWeight: 500, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }} title="Ver historial médico">
+                                  🐾 {c.mascota_nombre}
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--muted)' }}>🐾 Sin mascota</span>
+                              )}
                             </td>
                             <td style={{ padding: '14px 20px' }}>
                               <span style={{ background: `${estadoColor[c.estado] || '#78909C'}15`, color: estadoColor[c.estado] || '#78909C', fontSize: '0.75rem', fontWeight: 600, padding: '4px 12px', borderRadius: 100, display: 'inline-block', textTransform: 'capitalize' }}>
@@ -1129,12 +1128,14 @@ export default function Inicio() {
                 </div>
               )}
             </div>
+            </>
           )
         )}
 
         {/* ADMIN */}
         {view === 'admin' && (
-          <div style={{ padding: '48px 40px' }}>
+          <>
+            <div style={{ padding: '40px 40px 0' }}>
             {/* ── Dashboard summary cards ── */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 36 }}>
               <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '28px 24px', display: 'flex', alignItems: 'center', gap: 18 }}>
@@ -1156,64 +1157,18 @@ export default function Inicio() {
                 </div>
               </div>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-              <div>
-                <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Calendario de citas</h3>
-                <p style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>Todas las citas</p>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button onClick={() => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })} style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                </button>
-                <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)', minWidth: 140, textAlign: 'center' }}>
-                  {(() => {
-                    const end = new Date(weekStart)
-                    end.setDate(end.getDate() + 4)
-                    const fmt = (d: Date) => d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
-                    return `${fmt(weekStart)} – ${fmt(end)}`
-                  })()}
-                </span>
-                <button onClick={() => setWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })} style={{ width: 38, height: 38, borderRadius: 10, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-              </div>
             </div>
-
-            {loadingCitas ? <LoadingDots /> : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
-                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie'].map((dia, i) => {
-                  const date = new Date(weekStart)
-                  date.setDate(date.getDate() + i)
-                  const dateStr = date.toISOString().slice(0, 10)
-                  const dayCitas = citas.filter(c => c.fecha === dateStr)
-                  const isToday = new Date().toISOString().slice(0, 10) === dateStr
-
-                  return (
-                    <div key={dia} style={{ background: 'white', border: isToday ? '2px solid var(--teal)' : '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
-                      <div style={{ background: isToday ? 'var(--teal)' : 'var(--teal-light)', padding: '10px 12px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase', color: isToday ? 'white' : 'var(--teal-dark)' }}>{dia}</div>
-                        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.15rem', fontWeight: 700, color: isToday ? 'white' : 'var(--teal-dark)', marginTop: 2 }}>{date.getDate()}</div>
-                      </div>
-                      <div style={{ padding: '8px', minHeight: 120 }}>
-                        {dayCitas.length === 0 ? (
-                          <div style={{ padding: '16px 8px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--muted)' }}>Sin citas</div>
-                        ) : (
-                          dayCitas.map(c => (
-                            <div key={c.id} style={{ padding: '8px 10px', marginBottom: 6, background: 'var(--cream)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                              <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--teal-dark)', marginBottom: 3 }}>{c.hora.slice(0, 5)}</div>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text)', marginBottom: 1 }}>{(c as CitaAdmin).cliente_nombre}</div>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>🐾 {c.mascota_nombre}</div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+            {bannerCitasError()}
+            <Calendario
+              citas={citas}
+              loading={loadingCitas}
+              titulo="Calendario"
+              subtitulo="Todas las citas de todos los clientes"
+              tituloEvento={c => `🐾 ${c.mascota_nombre || 'Sin mascota'}`}
+              subtituloEvento={c => c.cliente_nombre}
+              onVerHistorial={c => abrirHistorial(c.mascota_id!, c.mascota_nombre || 'Sin mascota')}
+            />
+          </>
         )}
 
         {/* VETERINARIOS */}
